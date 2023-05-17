@@ -62,11 +62,10 @@ def GetRingGeneratorsCov():
         
     C[(15,0)] = [transvectant(C[(3,8)][0], C32_4, 8)]
 
-    LW = C.keys()
-    key_list = [k for k in C.keys()]
-    values = [C[k] for k in key_list]
+    LW = [k for k in C.keys()]
+    values = [C[k] for k in LW]
     LCov = [c.form().numerator() for c in reduce(lambda x,y : x + y, values)]
-    cov_names = [[''.join([str(j) for j in k]) for j in range(len(C[k]))] for k in key_list]
+    cov_names = [[''.join([str(j) for j in k]) for j in range(len(C[k]))] for k in LW]
     wt_names = reduce(lambda x,y : x + y, [n if len(n) == 1 else [n[i] + str(i+1) for i in range(len(n))] for n in cov_names])
     names = ['Co' + n for n in wt_names]
     Co = PolynomialRing(QQ, names)

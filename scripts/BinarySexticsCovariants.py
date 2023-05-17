@@ -17,21 +17,37 @@ class BinarySexticsCovariants:
     def __init__(self, a, b):
         self.a = a
         self.b = b
-        self.weight = [a,b]
+        self.weight = (a,b)
 
     def MakeCov(L):
         S = [[BinarySexticsCovariants.LCo[k]**L[k],BinarySexticsCovariants.LCov[k]**L[k]] for k in range(len(L))]
         S1 = prod(S[k][0] for k in range(len(S)))
         S2 = prod(S[k][1] for k in range(len(S)))
         return [S1,S2]
-        
-    def GetGeneratorsCov(weight_list, wt):
+
+    # Somehow this is slow if one runs it line by line, but quite fast in practice ?!
+    def GetGeneratorsCovSlow(weight_list, wt):
         has_zero = [ any([x[i] == 0 for x in weight_list]) for i in range(2)]
         assert not all(has_zero)
         if (has_zero[1]) or ((not has_zero[0]) and (wt[0] < wt[1])):
             return BinarySexticsCovariants.GetGeneratorsCov([[x[1],x[0]] for x in weight_list], [wt[1], wt[0]])
         exps = list(WeightedIntegerVectors(wt[1],[x[1] for x in weight_list]))
         return [exp for exp in exps if sum([exp[i]*weight_list[i][0] for i in range(len(exp))]) == wt[0]]
+
+    def GetGeneratorsCov(weight_list, wt):
+        if (len(weight_list) == 0):
+            if (wt == (0,0)):
+                return [[]]
+            else:
+                return []
+        wt0 = weight_list[0]
+        assert not ((wt0[0] == 0) and (wt0[1] == 0))
+        max_w0 = min([wt[i] // wt0[i] for i in range(2) if wt0[i] != 0])
+        all_ws = []
+        for w0 in range(max_w0+1):
+            ws = BinarySexticsCovariants.GetGeneratorsCov(weight_list[1:], (wt[0]-w0*wt0[0], wt[1]-w0*wt0[1]))
+            all_ws += [[w0] + w for w in ws]
+        return all_ws
         
     def GetBasisAndRelationsCov(self):
         W = BinarySexticsCovariants.GetGeneratorsCov(BinarySexticsCovariants.LW, self.weight)
