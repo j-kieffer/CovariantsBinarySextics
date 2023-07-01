@@ -55,11 +55,19 @@ class BinarySexticsCovariants:
         poly_ring_bivariate = BinarySexticsCovariants.LCov[0].parent()
         coeff_ring = poly_ring_bivariate.base_ring()
         # Here we are using the theorem by Roberts, stating it is enough to consider the coefficient of x^b
-        lcs = [coeff_ring(c[1].coefficient([0,self.b])) for c in covs]
-        exps = reduce(lambda x,y: x.union(y), [Set(lc.exponents()) for lc in lcs])
+        # lcs = [coeff_ring(c[1].coefficient([0,self.b])) for c in covs]
+        lcs = [[coeff_ring(c[1].coefficient([i,j])) for c in covs] for i in range(7) for j in range(7)]
+        # exps = reduce(lambda x,y: x.union(y), [Set(lc.exponents()) for lc in lcs])
+        exps = [reduce(lambda x,y: x.union(y), [Set(lc.exponents()) for lc in lcss], Set([])) for lcss in lcs]
         # !! TODO - It might be faster to work over QQ here and then normalize
-        coeffs_mat = Matrix([[ZZ(lc.coefficient(e)) for e in exps] for lc in lcs])
-        rels = coeffs_mat.kernel().basis()
+        # coeffs_mat = Matrix([[ZZ(lc.coefficient(e)) for e in exps] for lc in lcs])
+        coeffs_mats = [Matrix([[ZZ(lc.coefficient(e)) for e in exps[j]] for lc in lcs[j]]) for j in range(len(exps))]
+        coeffs_mat = reduce(lambda x,y : x.augment(y), coeffs_mats)
+        kers = [coeffs_mat.kernel() for coeffs_mat in coeffs_mats]
+        ker = reduce(lambda x,y: x.intersection(y), kers)
+        assert ker == coeffs_mat.kernel()
+        # rels = coeffs_mat.kernel().basis()
+        rels = ker.basis()
         rels_symb = [sum([rel[i]*covs[i][0] for i in range(len(covs))]) for rel in rels]
         C_basis = [covs[i][0] for i in coeffs_mat.pivot_rows()]
         return C_basis, rels_symb
