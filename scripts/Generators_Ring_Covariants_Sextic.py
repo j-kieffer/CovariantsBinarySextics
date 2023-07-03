@@ -71,4 +71,9 @@ def GetRingGeneratorsCov():
     Co = PolynomialRing(QQ, names)
     LCo = Co.gens()
 
+    # Doubling of the (6,6)
+    LW = reduce(lambda x,y: x+y, [[k for p in C[k]] for k in LW])
+    # Sanity check
+    assert (len(LW) == len(LCo)) and (len(LCo) == len(LCov))
+    
     return LW, LCo, LCov
