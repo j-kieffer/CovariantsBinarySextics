@@ -1,5 +1,6 @@
 import sage
-from sage.all import GF, ZZ, QQ
+from sage.all import GF, ZZ, QQ, prod, PolynomialRing
+from sage.all import FunctionField
 from sage.rings.polynomial.laurent_polynomial_ring import LaurentPolynomialRing
 from sage.rings.power_series_ring import PowerSeriesRing
 from sage.matrix.matrix_space import MatrixSpace
@@ -80,7 +81,9 @@ class qExpSiegel(object):
         coeffs = self.coefficients()
         eval_coeffs = {}
         for m in coeffs.keys():
-            value = coeffs[m](x12, y1, y2)
+            R = coeffs[m].base_ring()
+            value_func = coeffs[m](R(y1), R(y2))
+            value = value_func.substitute(x12)
             mon = x1**m.exponents()[0][0]*x2**m.exponents()[0][1]
             eval_coeffs[mon] = value
         return sum([eval_coeffs[m]*m for m in eval_coeffs.keys()])
@@ -117,14 +120,16 @@ class ThetaWithChar(qExpSiegel):
     def __init__(self, char, prec, const=False):
         if const:
             self.base = QQ
-            S = LaurentPolynomialRing(QQ, "r12")
+            S = FunctionField(QQ, "r12")
             r12 = S.gen()
         else:
             QQi = QuadraticField(-1, "i")
             i = QQi.gen()
             self.base = QQi
-            S = LaurentPolynomialRing(QQi, ["r12", "zeta1", "zeta2"])
-            r12, zeta1, zeta2 = S.gens()
+            QQiu = FunctionField(QQi, "r12")
+            r12 = QQiu.gen()
+            S = LaurentPolynomialRing(QQiu, ["zeta1", "zeta2"])
+            zeta1, zeta2 = S.gens()
         R = PowerSeriesRing(S, ["r1", "r2"])
         r1, r2 = R.gens()
         theta = R(0)
@@ -142,14 +147,14 @@ class ThetaWithChar(qExpSiegel):
             for n2 in range(min_n2, max_n2 + 1):
                 if const:
                     zeta_term = 1
-                    coeff = (-1)**(n1*nu1 + n2*nu2)
+                    coeff = int((-1)**(n1*nu1 + n2*nu2))
                 else:
                     zeta_term = zeta1**(2*n1+mu1) * zeta2**(2*n2+mu2)
                     coeff = i**((2*n1+mu1)*nu1 + (2*n2+mu2)*nu2)
                 r_term = r1**((2*n1+mu1)**2) * r12**((2*n1+mu1)*(2*n2+mu2)) * r2**((2*n2+mu2)**2)
                 theta += coeff*zeta_term*r_term
         if const:
-            factor = (-1)**((mu1*nu1 + mu2*nu2) // 2)
+            factor = int((-1)**((mu1*nu1 + mu2*nu2) // 2))
             theta *= factor
             self.gens = r1, r12, r2
         else:
@@ -183,7 +188,7 @@ def G(idx, prec):
 
 def CheckG(i, prec):
     char = ThetaCharacteristic.get_odd_chars()[i-1] # indexing in the paper starts at 1
-    S = LaurentPolynomialRing(QQ, "r12")
+    S = FunctionField(QQ, "r12")
     r12 = S.gen()
     R = PowerSeriesRing(S, ["r1" ,"r2"])
     r1, r2 = R.gens()
@@ -201,11 +206,47 @@ def CheckG(i, prec):
         min_n2 = ceil((-mu2 - d2) / 2)
         max_n2 = floor((-mu2 + d2) / 2)
         for n2 in range(min_n2, max_n2 + 1):
-            coeff1 = (-1)**(n1*nu1 + n2*nu2) * (2*n1 + mu1)
-            coeff2 = (-1)**(n1*nu1 + n2*nu2) * (2*n2 + mu2)
+            coeff1 = int((-1)**(n1*nu1 + n2*nu2) * (2*n1 + mu1))
+            coeff2 = int((-1)**(n1*nu1 + n2*nu2) * (2*n2 + mu2))
             r_term = r1**((2*n1+mu1)**2) * r12**((2*n1+mu1)*(2*n2+mu2)) * r2**((2*n2+mu2)**2)
             G1 += coeff1*r_term
             G2 += coeff2*r_term
     G1 += O(r1**(prec+1))
     G2 += O(r1**(prec+1))
     return [G1, G2] == G(i, prec)
+
+def get_chi5(prec):
+    thetas = [ThetaWithChar(chi, prec, const=True) for chi in ThetaCharacteristic.get_even_chars()]
+    return prod([th.qexp for th in thetas])/(-64)
+
+def get_chi63(prec):
+    from ThetaFourier import ThetaCharacteristic, ThetaWithChar, G
+    Gs = [G(i,prec) for i in range(1,7)]
+    R = Gs[0][0].parent()
+    S = PolynomialRing(R, ["x", "y"])
+    x,y = S.gens()
+    return prod([g[0]*x+g[1]*y for g in Gs]) / 64
+
+def get_chi6m2(prec):
+    chi5 = get_chi5(prec)
+    chi63 = get_chi63(prec)
+    r1, r2 = chi5.parent().gens()
+    r12 = chi5.base_ring().gen()
+    lc = (r12**2 - r12**(-2))*r1**4*r2**4
+    chi6m2_33_times_lc = ((chi5 / lc)**(-1) * chi63).dict() # (x^3*y^3)
+    chi6m2_33_times_lc_mons = chi6m2_33_times_lc.keys()
+    lc_exp = [k for k in lc.dict()][0]
+    lc_mon = lc.dict()[lc_exp]
+    R = chi63.parent()
+    chi6m2 = R(0)
+    r1, r2 = chi63.base_ring().gens()
+    x, y = chi63.parent().gens()
+    for exp in chi6m2_33_times_lc_mons:
+        coeff = chi6m2_33_times_lc[exp]
+        coeff_dict = coeff.dict()
+        chi6m2_coeff = coeff.parent()(0)
+        for k in coeff_dict.keys():
+            chi6m2_coeff += (coeff_dict[k] / lc_mon ) * r1**(k[0]-lc_exp[0]) * r2**(k[1]-lc_exp[1])
+        chi6m2 += chi6m2_coeff * x**(exp[0]) * y**(exp[1])
+    return chi6m2
+            
