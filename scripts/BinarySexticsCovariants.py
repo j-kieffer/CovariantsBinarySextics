@@ -150,3 +150,47 @@ class BinarySexticsCovariants(SageObject):
         C_basis = [covs[i][0] for i in coeffs_mat.pivot_rows()]
         assert len(C_basis) == self.Dimension()
         return C_basis, rels_symb
+
+
+    def GetBasis(self):
+        r"""
+        Return the generators for the covariants in the space of covariants of binary sextics
+
+        OUTPUT: a list of polynomials in the covariants that generate the space
+
+        EXAMPLES:
+
+        This example is Example 2.1 in the overleaf. ::
+
+            sage: bsc = BinarySexticsCovariants(6,0)
+            sage: bsc.GetBasis()
+            [Co60, Co20*Co40, Co20^3]
+
+        This example is the Example commeneted out after Example 2.4 in the overleaf. ::
+
+            sage: bsc = BinarySexticsCovariants(6,8)
+            sage: bsc.GetBasis()
+            [Co32*Co36, Co28*Co40, Co24*Co44, Co20*Co24^2, Co20^2*Co28, Co16*Co20*Co32]
+
+        """
+        W = BinarySexticsCovariants.GetGeneratorsCov(BinarySexticsCovariants.LW, self.weight)
+        covs = [BinarySexticsCovariants.MakeCov(wt) for wt in W]
+        poly_ring_bivariate = BinarySexticsCovariants.LCov[0].parent()
+        coeff_ring = poly_ring_bivariate.base_ring()
+        # Here we are using the theorem by Roberts, stating it is enough to consider the coefficient of x^b
+        lcs = [coeff_ring(c[1].coefficient([0,self.b])) for c in covs]
+        exps = reduce(lambda x,y: x.union(y), [Set(lc.exponents()) for lc in lcs], Set([]))
+        # We try to make this more efficient as exps is very long
+        maybe_enough_coeffs = len(lcs)+2
+        coeffs_mat = Matrix([[ZZ(lc.coefficient(e)) for e in exps[:maybe_enough_coeffs]] for lc in lcs])
+        maybe_rels = coeffs_mat.kernel().basis()
+        check_rels = [sum([rel[i]*covs[i][1] for i in range(len(covs))]) for rel in maybe_rels]
+        rels = [maybe_rels[i] for i in range(len(maybe_rels)) if check_rels[i] == 0]
+        ## Fixing C_basis
+        add_exps = reduce(lambda x,y: x.union(y), [Set(coeff_ring(check_rels[i].coefficient([0,self.b])).exponents()) for
+                                                   i in range(len(maybe_rels)) if check_rels[i] != 0], Set([]))
+        all_exps = exps[:maybe_enough_coeffs] + add_exps[:len(add_exps)]
+        coeffs_mat = Matrix([[ZZ(lc.coefficient(e)) for e in all_exps] for lc in lcs])
+        C_basis = [covs[i][0] for i in coeffs_mat.pivot_rows()]
+        # assert len(C_basis) == self.Dimension()
+        return C_basis
