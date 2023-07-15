@@ -38,6 +38,10 @@ class BinarySexticsCovariants(SageObject):
         self.b = b
         self.weight = (a,b)
 
+    def GetCov(cov_name):
+        idx = BinarySexticsCovariants.LCo[0].parent().variable_names().index(cov_name)
+        return BinarySexticsCovariants.LCov[idx]
+        
     def MakeCov(L):
         r"""
         Returns a list with two elements, the first is the polynomial in the covariants defined by the exponents in L, and the second is

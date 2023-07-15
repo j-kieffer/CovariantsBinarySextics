@@ -220,12 +220,48 @@ def get_chi5(prec):
     return prod([th.qexp for th in thetas])/(-64)
 
 def get_chi63(prec):
-    from ThetaFourier import ThetaCharacteristic, ThetaWithChar, G
     Gs = [G(i,prec) for i in range(1,7)]
     R = Gs[0][0].parent()
     S = PolynomialRing(R, ["x", "y"])
     x,y = S.gens()
     return prod([g[0]*x+g[1]*y for g in Gs]) / 64
+
+def change_r_to_q(qexp):
+    # R = qexp.base_ring().base_ring().base_ring()
+    S = qexp.base_ring().base_ring()
+    R = QQ
+    Ru = FunctionField(R, "u")
+    u = Ru.gen()
+    Ruq = PowerSeriesRing(Ru, ["q1", "q2"])
+    q1, q2 = Ruq.gens()
+    qexp_dict = qexp.dict()
+    res = Ruq(0)
+    for exp in qexp_dict.keys():
+        new_exp = (exp[0] // 4, exp[1] // 4)
+        coeff_dict = qexp_dict[exp].dict()
+        coeff = [c for c in coeff_dict.values()][0]
+        num_dict = coeff.numerator().dict()
+        den_dict = coeff.denominator().dict()
+        num = Ru(0)
+        for num_exp in num_dict.keys():
+            num += num_dict[num_exp]*u**(num_exp // 2)
+        denom = Ru(0)
+        for den_exp in den_dict.keys():
+            denom += den_dict[den_exp]*u**(den_exp // 2)
+        mon = num / denom
+        res += mon * q1**new_exp[0] * q2**new_exp[1]
+    return res
+
+def change_r_to_q_cov(cov):
+    cov_coeffs = cov.dict()
+    res = 0
+    for exp in cov_coeffs.keys():
+        qexp = change_r_to_q(cov_coeffs[exp])
+        R = PolynomialRing(qexp.parent(), ["x", "y"])
+        x,y = R.gens()
+        mon = qexp*x**exp[0]*y**exp[1]
+        res = R(res) + mon
+    return res
 
 def get_chi6m2(prec):
     chi5 = get_chi5(prec)
@@ -248,5 +284,4 @@ def get_chi6m2(prec):
         for k in coeff_dict.keys():
             chi6m2_coeff += (coeff_dict[k] / lc_mon ) * r1**(k[0]-lc_exp[0]) * r2**(k[1]-lc_exp[1])
         chi6m2 += chi6m2_coeff * x**(exp[0]) * y**(exp[1])
-    return chi6m2
-            
+    return change_r_to_q_cov(chi6m2)
