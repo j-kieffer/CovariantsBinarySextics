@@ -5,7 +5,9 @@ This file contains functions to compute a basis for the space of covariants of b
 ## imports
 from functools import reduce
 from sage.structure.sage_object import SageObject
-from sage.all import Matrix, Partitions, ZZ, QQ, prod, Set
+from sage.all import Matrix, Partitions, ZZ, QQ, prod, Set, PolynomialRing
+from sage.combinat.q_analogues import q_multinomial
+from sage.combinat.q_analogues import q_binomial
 from sage.combinat.integer_vector_weighted import WeightedIntegerVectors
 from Generators_Ring_Covariants_Sextic import GetRingGeneratorsCov
 
@@ -102,6 +104,20 @@ class BinarySexticsCovariants(SageObject):
         def p(k,n):
             return Partitions(n,max_length=k, max_part=6).cardinality()
         return p(a,n) - p(a,n-1)
+        
+    def Dimension2(self):
+        a = self.a
+        b = self.b
+        if ((b % 2) == 1):
+            return 0
+        else:
+            R = PolynomialRing(ZZ, ['p'])
+            p = R.gen()
+            n = 3*a-b//2
+            f = (1-p)*q_binomial(6+a,a,p)
+            d = f.list()[n]
+            return d
+        
     
     def GetBasisAndRelationsCov(self):
         r"""
