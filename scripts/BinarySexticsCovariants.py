@@ -18,7 +18,7 @@ class BinarySexticsCovariants(SageObject):
 
      EXAMPLES:
     
-     This example is Example 2.1 in the overleaf. ::
+     This example is Example 2.1 in the overleaf. :
 
         sage: bsc = BinarySexticsCovariants(6,0)
         sage: bsc.GetBasisAndRelationsCov()
@@ -164,7 +164,7 @@ class BinarySexticsCovariants(SageObject):
 
         EXAMPLES:
 
-        This example is Example 2.1 in the overleaf. ::
+        This example is Example 2.1 in the overleaf. :
 
             sage: bsc = BinarySexticsCovariants(6,0)
             sage: bsc.GetBasis()
