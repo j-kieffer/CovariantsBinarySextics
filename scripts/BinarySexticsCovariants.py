@@ -28,7 +28,7 @@ class BinarySexticsCovariants(SageObject):
         
     """
     
-    LW, LCo, LCov = GetRingGeneratorsCov()
+    LW, LCo, LCov, DCov = GetRingGeneratorsCov()
 
     # Verifying the expression for C_{2,0}
     assert LCo[1].parent().variable_names()[1] == 'Co20'

@@ -1,5 +1,5 @@
 import sage
-from sage.all import GF, ZZ, QQ, prod, PolynomialRing
+from sage.all import GF, ZZ, QQ, prod, PolynomialRing, exp
 from sage.all import FunctionField
 from sage.rings.polynomial.laurent_polynomial_ring import LaurentPolynomialRing
 from sage.rings.power_series_ring import PowerSeriesRing
@@ -244,10 +244,10 @@ def change_r_to_q(qexp):
         den_dict = coeff.denominator().dict()
         num = Ru(0)
         for num_exp in num_dict.keys():
-            num += num_dict[num_exp]*u**(num_exp // 2)
+            num += num_dict[num_exp]*u**(num_exp // 4)
         denom = Ru(0)
         for den_exp in den_dict.keys():
-            denom += den_dict[den_exp]*u**(den_exp // 2)
+            denom += den_dict[den_exp]*u**(den_exp // 4)
         mon = num / denom
         res += mon * q1**new_exp[0] * q2**new_exp[1]
     return res
@@ -285,3 +285,33 @@ def get_chi6m2(prec):
             chi6m2_coeff += (coeff_dict[k] / lc_mon ) * r1**(k[0]-lc_exp[0]) * r2**(k[1]-lc_exp[1])
         chi6m2 += chi6m2_coeff * x**(exp[0]) * y**(exp[1])
     return change_r_to_q_cov(chi6m2)
+
+def rat_func_sub(f, u):
+    num = f.numerator().subs(u)
+    denom = f.denominator().subs(u)
+    return num / denom
+
+def rat_func_to_pow_ser(f):
+    R = PowerSeriesRing(QQ, "u")
+    return R(f.numerator())/R(f.denominator())
+
+def get_taylor_exp(chi):
+    exps = list(chi.dict().keys())
+    Rs = PowerSeriesRing(QQ, "s")
+    s = Rs.gen()
+    Rsq = PowerSeriesRing(Rs, ["q1", "q2"])
+    q1, q2 = Rsq.gens()
+    Rsqxy = PolynomialRing(Rsq, ["x", "y"])
+    x, y = Rsqxy.gens()
+    res = Rsqxy(0)
+    for e in exps:
+        mon = chi.dict()[e]
+        mon_exps = list(mon.dict().keys())
+        res_mon = Rsq(0)
+        for mon_exp in mon_exps:
+            f = mon.dict()[mon_exp]    
+            f_pow = f.numerator().subs(exp(s)) / f.denominator().subs(exp(s))
+            res_mon += f_pow * q1**mon_exp[1] * q2**mon_exp[2]
+        res += res_mon * x**e[1] * y**e[2]
+    return res
+    
