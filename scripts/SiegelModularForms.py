@@ -9,10 +9,17 @@ from BinarySexticsCovariants import BinarySexticsCovariants as BSC
 from ThetaFourier import get_chi6m2, get_taylor_exp
 
 def get_smf_cov_basis(k, j, prec=10):
+    print("Computing expansion of chi_6_m_2...")
     chi = get_chi6m2(prec)
+    print("Done!")
+    print("Producing Taylor expansion around s = 0...")
     t_chi = get_taylor_exp(chi)
+    print("Done!")
+    print("Creating basis of covariants...")
     bsc = BSC(k,j)
     basis = bsc.GetBasis()
+    print("Done!")
+    print("Substituting chi_6_m_2...")
     basis_expanded = [b.subs(bsc.DCov) for b in basis]
     exps = list(t_chi.dict().keys())
     t_chi_comps = [t_chi.dict()[exp] for exp in exps]
@@ -24,6 +31,8 @@ def get_smf_cov_basis(k, j, prec=10):
     b_comps = [[b.dict().get(exp,U(0)) for exp in exps] for b in basis_expanded]
     sub_dict = {a[i] : t_chi_comps[i] for i in range(7)}
     b_comps_expanded = [[R(b_c.subs(sub_dict)) for b_c in b_comps_s] for b_comps_s in b_comps]
+    print("Done!")
+    print("Solving linear system...")
     qexps = reduce(lambda x,y: x.union(y), [reduce(lambda x,y: x.union(y), [Set(list(b_c.dict().keys())) for b_c in b_c_e]) for b_c_e in b_comps_expanded])
     ker = VectorSpace(QQ, len(basis))
     for qexp in qexps:
@@ -51,4 +60,5 @@ def get_smf_cov_basis(k, j, prec=10):
                 mat_coeffs = Matrix(all_coeffs)
                 ker_mat = mat_coeffs.kernel()
                 ker = ker.intersection(ker_mat)
+    print("Done!")
     return [sum([b.denominator()*b[i]*basis[i] for i in range(len(basis))]) for b in ker.basis()]
