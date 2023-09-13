@@ -8,6 +8,7 @@ from sage.misc.functional import sqrt
 from sage.functions.other import ceil, floor
 from sage.rings.big_oh import O
 from sage.rings.number_field.number_field import QuadraticField
+from sage.functions.other import factorial
 
 class ThetaCharacteristic(object):
 
@@ -237,7 +238,7 @@ def change_r_to_q(qexp):
     qexp_dict = qexp.dict()
     res = Ruq(0)
     for exp in qexp_dict.keys():
-        new_exp = (exp[0] // 4, exp[1] // 4)
+        new_exp = (exp[0] // 8, exp[1] // 8)
         coeff_dict = qexp_dict[exp].dict()
         coeff = [c for c in coeff_dict.values()][0]
         num_dict = coeff.numerator().dict()
@@ -295,7 +296,16 @@ def rat_func_to_pow_ser(f):
     R = PowerSeriesRing(QQ, "u")
     return R(f.numerator())/R(f.denominator())
 
-def get_taylor_exp(chi):
+def exponential(prec):
+    # res = R(0)
+    # s = R.gen()
+    # for n in range(prec):
+    #    res += 1/factorial(n) * s**n
+    Rs = PowerSeriesRing(QQ, "s", default_prec=prec)
+    s = Rs.gen()
+    return exp(s)
+
+def get_taylor_exp(chi, prec):
     exps = list(chi.dict().keys())
     Rs = PowerSeriesRing(QQ, "s")
     s = Rs.gen()
@@ -304,14 +314,15 @@ def get_taylor_exp(chi):
     Rsqxy = PolynomialRing(Rsq, ["x", "y"])
     x, y = Rsqxy.gens()
     res = Rsqxy(0)
+    exp_s = exponential(prec)
     for e in exps:
         mon = chi.dict()[e]
         mon_exps = list(mon.dict().keys())
         res_mon = Rsq(0)
         for mon_exp in mon_exps:
             f = mon.dict()[mon_exp]    
-            f_pow = f.numerator().subs(exp(s)) / f.denominator().subs(exp(s))
-            res_mon += f_pow * q1**mon_exp[1] * q2**mon_exp[2]
-        res += res_mon * x**e[1] * y**e[2]
+            f_pow = f.numerator().subs(exp_s) / f.denominator().subs(exp_s)
+            res_mon += f_pow * q1**mon_exp[0] * q2**mon_exp[1]
+        res += res_mon * x**e[0] * y**e[1]
     return res
     
