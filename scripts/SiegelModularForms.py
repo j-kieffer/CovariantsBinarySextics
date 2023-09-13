@@ -9,6 +9,24 @@ from BinarySexticsCovariants import BinarySexticsCovariants as BSC
 from ThetaFourier import get_chi6m2, get_taylor_exp
 
 def get_smf_cov_basis(k, j, prec=10):
+    r"""
+    This function computes a basis of Siegel modular forms of weight (k,j) as polynomials in the covariants. prec is the precision for which to take the Fourier expansion of chi_6_m_2 (degree of the monomials in q_1, q_2).
+    
+    EXAMPLES:
+
+    sage: get_smf_cov_basis(4,0)
+    [-Co20^2 + 3*Co40]
+
+    sage: get_smf_cov_basis(6,0)
+    [-28*Co20^3 + 57*Co20*Co40 + 3*Co60]
+
+    sage: get_smf_cov_basis(8,0)
+    [Co20^4 - 6*Co20^2*Co40 + 9*Co40^2]
+
+    sage: len(get_smf_cov_basis(12,0))
+    3
+    
+    """
     print("Computing expansion of chi_6_m_2...")
     chi = get_chi6m2(prec)
     print("Done!")
@@ -25,10 +43,11 @@ def get_smf_cov_basis(k, j, prec=10):
     t_chi_comps = [t_chi.dict()[exp] for exp in exps]
     t_chi_vals = list(t_chi.dict().values())
     R = t_chi_vals[0].parent()
+    b_exps = list(basis_expanded[0].dict().keys())
     vals = list(basis_expanded[0].dict().values())
     U = vals[0].parent()
     a = U.gens()
-    b_comps = [[b.dict().get(exp,U(0)) for exp in exps] for b in basis_expanded]
+    b_comps = [[b.dict().get(exp,U(0)) for exp in b_exps] for b in basis_expanded]
     sub_dict = {a[i] : t_chi_comps[i] for i in range(7)}
     b_comps_expanded = [[R(b_c.subs(sub_dict)) for b_c in b_comps_s] for b_comps_s in b_comps]
     print("Done!")
@@ -36,7 +55,7 @@ def get_smf_cov_basis(k, j, prec=10):
     qexps = reduce(lambda x,y: x.union(y), [reduce(lambda x,y: x.union(y), [Set(list(b_c.dict().keys())) for b_c in b_c_e]) for b_c_e in b_comps_expanded])
     ker = VectorSpace(QQ, len(basis))
     for qexp in qexps:
-        for i in range(7):
+        for i in range(len(b_exps)):
             all_vals = []
             all_coeffs = []
             for j, b_c_e in enumerate(b_comps_expanded):
@@ -54,7 +73,7 @@ def get_smf_cov_basis(k, j, prec=10):
                 max_len = max([len(all_coeffs[j]) + all_vals[j] for j in range(len(all_vals)) if all_vals[j] <= 0])
                 for j in range(len(all_vals)):
                     v = all_vals[j]
-                    if (v == infinity):
+                    if (v >= 0):
                         v = max_len
                     all_coeffs[j] = [0 for l in range(v-min_val)] + all_coeffs[j]
                 mat_coeffs = Matrix(all_coeffs)
