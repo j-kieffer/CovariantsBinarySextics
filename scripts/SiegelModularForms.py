@@ -6,7 +6,7 @@ from sage.rings.big_oh import O
 from sage.rings.infinity import infinity
 from sage.rings.rational_field import QQ
 from sage.rings.integer_ring import ZZ
-from sage.all import NumberField
+from sage.all import NumberField, pari
 from sage.sets.set import Set
 
 from BinarySexticsCovariants import BinarySexticsCovariants as BSC
@@ -42,17 +42,17 @@ class SMF(SageObject):
         self.basis = None
         self.decomposition = None
         self.fields = None
-        if j == 0:
-            B = SMFPrecomputedScalarBasis(k)
-            if not B is None:
-                self.SetBasis(B)
+        #if j == 0:
+        #    B = SMFPrecomputedScalarBasis(k)
+        #    if not B is None:
+        #        self.SetBasis(B)
 
     def SetBasis(self, L):
         CRing = RingOfCovariants()
         self.basis = [CRing(x) for x in L]
 
     def GetBasis(self, prec=3, taylor_prec=20):
-        if not self.basis is None:
+        if (not self.basis is None and prec <= self.prec):
             return self.basis
 
         k = self.k
@@ -142,7 +142,7 @@ class SMF(SageObject):
 
     def WriteBasisToFile(self, filename):
         with open(filename, "w") as f:
-            B = self.basis
+            B = self.GetBasis()
             d = self.Dimension()
             for k in range(d):
                 f.write(str(B[k]))
@@ -216,16 +216,17 @@ class SMF(SageObject):
             if F.degree() == 1:
                 fields.append(QQ)
             else:
-                pol = pari.polredabs(pol)
-                fields.append(NumberField(pol))
+                R = pol.parent()
+                pol = R(pari.polredabs(pol))
+                fields.append(NumberField(pol, "a"))
         self.decomposition = res
         self.fields = fields
         return res
 
     def HeckeFields(self):
-        if not self.decomposition is None:
+        if self.decomposition is None:
             self.HeckeDecomposition()
-        return self.HeckeFields
+        return self.fields
 
     def HeckeActionOnEigenvectors(self, q, filename="hecke", log=True):
         self.WriteDecompositionToFile(filename + ".in")
