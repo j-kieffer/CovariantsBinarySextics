@@ -15,6 +15,8 @@ small cofactor). If a given matrix is proved to be integral by other means,
 then the result is certified. */
 
 #include <stdlib.h>
+#include "fmpq.h"
+#include "fmpq_mat.h"
 #include "acb_theta.h"
 
 void parse_integers(slong* nb_spaces, slong** dims, const char* filename_in)
@@ -374,7 +376,121 @@ void hecke_slash(acb_poly_t im, const acb_mat_t star, const acb_poly_t val,
     acb_clear(a);
 }
 
-int hecke_act_on_space(fmpz_mat_t mat, const fmpz_mpoly_struct* pols, slong dim,
+static int
+cont_frac_step(fmpz_t r, arf_t next, const arf_t current, slong prec, slong tol_exp)
+{
+    int res = 0;
+    arf_get_fmpz(r, current, ARF_RND_FLOOR);
+    arf_sub_fmpz(next, current, r, prec, ARF_RND_NEAR);
+    if (arf_cmp_2exp_si(next, tol_exp) < 0)
+    {
+        res = 1;
+    }
+    else
+    {
+        arf_ui_div(next, 1, next, prec, ARF_RND_NEAR);
+    }
+    return res;
+}
+
+static slong
+cont_frac_max_nb_steps(const acb_t x, slong prec)
+{
+    return prec/2;
+}
+
+static void
+cont_frac_get_fmpq(fmpq_t c, fmpz* r_vec, slong nb_steps)
+{
+    slong k;
+    fmpq_zero(c);
+    fmpq_add_fmpz(c, c, &r_vec[nb_steps-1]);
+    for (k = nb_steps-2; k >= 0; k--)
+    {
+        fmpq_inv(c, c);
+        fmpq_add_fmpz(c, c, &r_vec[k]);
+    }
+}
+
+int acb_rationalize(fmpq_t c, fmpz_t den, const acb_t x,
+    const fmpz_t probable_den, slong prec)
+{
+    acb_t z;
+    arf_t current;
+    mpz_t n, d;
+    fmpz_t d_fmpz;
+    int res = 1;
+    int stop = 0;
+    slong max_steps = cont_frac_max_nb_steps(x, prec);
+    fmpz* r_vec;
+    slong k;
+    slong tol_exp;
+
+    acb_init(z);
+    arf_init(current);
+    mpz_init(n);
+    mpz_init(d);
+    fmpz_init(d_fmpz);
+    r_vec = _fmpz_vec_init(max_steps);
+
+    acb_mul_fmpz(z, x, probable_den, prec);
+
+    if (!arb_contains_zero(acb_imagref(z)))
+    {
+        flint_printf("(acb_rationalize) Error: contains no real number\n");
+        acb_printd(x, 10); flint_printf("\n");
+        fflush(stdout);
+        flint_abort();
+    }
+
+    if (mag_cmp_2exp_si(arb_radref(acb_realref(z)), 0) > 0)
+    {
+        /* Too imprecise */
+        res = 0;
+    }
+
+    if (res)
+    {
+        arf_set(current, arb_midref(acb_realref(z)));
+        k = 0;
+        while (!stop && (k < max_steps))
+        {
+            if (k < 2)
+            {
+                tol_exp = -prec/2;
+            }
+            else
+            {
+                tol_exp = -prec/8;
+            }
+            stop = cont_frac_step(&r_vec[k], current, current, prec, tol_exp);
+            k++;
+        }
+        if (k == max_steps)
+        {
+            res = 0;
+        }
+        else
+        {
+            res = 1;
+            cont_frac_get_fmpq(c, r_vec, k);
+            fmpq_div_fmpz(c, c, probable_den);
+            fmpq_get_mpz_frac(n, d, c);
+            fmpz_set_mpz(d_fmpz, d);
+            fmpz_lcm(den, d_fmpz, probable_den);
+        }
+    }
+
+    acb_clear(z);
+    arf_clear(current);
+    mpz_clear(n);
+    mpz_clear(d);
+    fmpz_clear(d_fmpz);
+    _fmpz_vec_clear(r_vec, max_steps);
+    return res;
+}
+
+int hecke_act_on_space(fmpq_mat_t mat, const fmpz_mpoly_struct* pols, slong dim,
     const acb_poly_struct* basic_covs, const acb_mat_struct* stars,
     slong nb, slong q, int is_T1, const fmpz_mpoly_ctx_t ctx, slong prec)
 {
@@ -382,11 +498,10 @@ int hecke_act_on_space(fmpz_mat_t mat, const fmpz_mpoly_struct* pols, slong dim,
     acb_mat_t s, t, hecke;
     acb_poly_t u, v;
     acb_t f;
-    arf_t rad;
     fmpz_t den;
     slong j, k, l;
     slong k0, j0;
-    int res = 0;
+    int res = 1;
 
     acb_mat_init(s, dim, dim);
     acb_mat_init(t, dim, dim);
@@ -394,7 +509,6 @@ int hecke_act_on_space(fmpz_mat_t mat, const fmpz_mpoly_struct* pols, slong dim,
     acb_poly_init(u);
     acb_poly_init(v);
     acb_init(f);
-    arf_init(rad);
     fmpz_init(den);
 
     /* Get weight */
@@ -448,35 +562,21 @@ int hecke_act_on_space(fmpz_mat_t mat, const fmpz_mpoly_struct* pols, slong dim,
     acb_mat_printd(hecke, 5);
 
     /* Round to integral matrix */
-    for (l = 0; (l < FLINT_MAX(10, n_sqrt(prec))) && !res; l++)
+    fmpz_one(den);
+    for (j = 0; (j < dim) && res; j++)
     {
-        res = 1;
-        fmpz_fac_ui(den, l + 1);
-        flint_printf("Trying cofactor ");
-        fmpz_print(den);
-        flint_printf("\n");
-        for (j = 0; (j < dim) && res; j++)
+        for (k = 0; (k < dim) && res; k++)
         {
-            for (k = 0; (k < dim) && res; k++)
-            {
-                acb_mul_fmpz(f, acb_mat_entry(hecke, j, k), den, prec);
-                if (!arb_contains_zero(acb_imagref(f)))
-                {
-                    flint_printf("(hecke_act_on_space) Error: not real\n");
-                    acb_printd(f, 10);
-                    flint_printf("\n");
-                    flint_abort();
-                }
-                acb_get_rad_ubound_arf(rad, acb_mat_entry(hecke, j, k), prec);
-                arf_mul_2exp_si(rad, rad, 10);
-                res = (arf_cmp_si(rad, 1) < 0)
-                    && acb_get_unique_fmpz(fmpz_mat_entry(mat, j, k), f);
-            }
+            acb_mul_fmpz(f, acb_mat_entry(hecke, j, k), den, prec);
+            res = acb_rationalize(fmpq_mat_entry(mat, j, k), den,
+                acb_mat_entry(hecke, j, k), den, prec);
         }
     }
     if (res)
     {
-        flint_printf("Success!\n");
+        flint_printf("Success with denominator ");
+        fmpz_print(den);
+        flint_printf("\n");
     }
     else
     {
@@ -489,12 +589,11 @@ int hecke_act_on_space(fmpz_mat_t mat, const fmpz_mpoly_struct* pols, slong dim,
     acb_poly_clear(u);
     acb_poly_clear(v);
     acb_clear(f);
-    arf_clear(rad);
     fmpz_clear(den);
     return res;
 }
 
-int hecke_attempt(fmpz_mat_struct* mats, fmpz_mpoly_struct** pols,
+int hecke_attempt(fmpq_mat_struct* mats, fmpz_mpoly_struct** pols,
     slong* dims, slong nb_spaces, slong q, const fmpz_mpoly_ctx_t ctx, slong prec)
 {
     flint_printf("\n(hecke_attempt) attempt at precision %wd\n", prec);
@@ -647,6 +746,47 @@ int hecke_attempt(fmpz_mat_struct* mats, fmpz_mpoly_struct** pols,
     return res;
 }
 
+/* This is copied from flint/src/fmpz_mat/io.c */
+
+#define xxx_putc(c)        \
+do {                       \
+    z = fputc((c), file);  \
+    if (z <= 0)            \
+        return z;          \
+} while (0)
+
+#define xxx_fmpq_print(f)        \
+do {                             \
+    z = fmpq_fprint(file, (f));  \
+    if (z <= 0)                  \
+        return z;                \
+} while(0)
+
+int fmpq_mat_fprint_pretty(FILE * file, const fmpq_mat_t mat)
+{
+    int z;
+    slong i, j;
+    slong r = mat->r;
+    slong c = mat->c;
+
+    xxx_putc('[');
+    for (i = 0; i < r; i++)
+    {
+        xxx_putc('[');
+        for (j = 0; j < c; j++)
+        {
+            xxx_fmpq_print(mat->rows[i] + j);
+            if (j != c - 1)
+                xxx_putc(' ');
+        }
+        xxx_putc(']');
+        xxx_putc('\n');
+    }
+    xxx_putc(']');
+
+    return z;
+}
+
 int main(int argc, const char *argv[])
 {
     slong q, nb_spaces;
@@ -654,7 +794,7 @@ int main(int argc, const char *argv[])
     slong prec;
     fmpz_mpoly_struct** pols;
     fmpz_mpoly_ctx_t ctx;
-    fmpz_mat_struct* mats;
+    fmpq_mat_struct* mats;
     FILE* file_out;
     slong k, j;
     int done = 0;
@@ -672,11 +812,11 @@ int main(int argc, const char *argv[])
     q = strtol(argv[1], NULL, 10);
     parse_integers(&nb_spaces, &dims, argv[2]);
     pols = flint_malloc(nb_spaces * sizeof(fmpz_mpoly_struct*));
-    mats = flint_malloc(nb_spaces * sizeof(fmpz_mat_struct));
+    mats = flint_malloc(nb_spaces * sizeof(fmpq_mat_struct));
 
     for (k = 0; k < nb_spaces; k++)
     {
-        fmpz_mat_init(&mats[k], dims[k], dims[k]);
+        fmpq_mat_init(&mats[k], dims[k], dims[k]);
         pols[k] = flint_malloc(dims[k] * sizeof(fmpz_mpoly_struct));
         for (j = 0; j < dims[k]; j++)
         {
@@ -701,7 +841,7 @@ int main(int argc, const char *argv[])
     }
     for (k = 0; k < nb_spaces; k++)
     {
-        fmpz_mat_fprint_pretty(file_out, &mats[k]);
+        fmpq_mat_fprint_pretty(file_out, &mats[k]);
         fprintf(file_out, "\n\n");
     }
     fclose(file_out);
@@ -713,7 +853,7 @@ int main(int argc, const char *argv[])
             fmpz_mpoly_clear(&pols[k][j], ctx);
         }
         flint_free(pols[k]);
-        fmpz_mat_clear(&mats[k]);
+        fmpq_mat_clear(&mats[k]);
     }
     flint_free(pols);
     flint_free(mats);
