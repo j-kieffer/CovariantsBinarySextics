@@ -6,6 +6,7 @@ from sage.rings.big_oh import O
 from sage.rings.infinity import infinity
 from sage.rings.rational_field import QQ
 from sage.rings.integer_ring import ZZ
+from sage.all import NumberField
 from sage.sets.set import Set
 
 from BinarySexticsCovariants import BinarySexticsCovariants as BSC
@@ -104,6 +105,8 @@ class SMF(SageObject):
         print("Done!")
         # Take only highest valuations
         self.basis = [sum([b.denominator()*b[i]*basis[i] for i in range(len(basis))]) for b in ker.basis()]
+        # This is not computed yet.
+        self.decomposition = None
 
     def GetBasis(self):
         return self.basis
@@ -119,6 +122,19 @@ class SMF(SageObject):
                 f.write(str(B[k]))
                 if k < d - 1:
                     f.write("\n")
+
+    def WriteDecompositionToFile(self, filename):
+        with open(filename, "w") as f:
+            D = self.HeckeDecomposition()
+            d = len(D)
+            for k in range(d):
+                e = len(D[k])
+                for l in range(e):
+                    f.write(str(D[k][l]))
+                    if l < e - 1:
+                        f.write("\n")
+                if k < d - 1:
+                    f.write("\n\n")
 
     # This computes the Hecke action on full basis up to some cofactor
     def HeckeAction(self, q, filename="hecke", log=True):
@@ -141,4 +157,58 @@ class SMF(SageObject):
         subprocess.run(["rm", filename + ".out"])
         return M
 
-    
+    def HeckeDecomposition(self):
+        if not self.decomposition is None:
+            return self.decomposition
+        M = self.HeckeAction(2)
+        print("Matrix of Hecke action at 2:\n{}".format(M))
+        fac = M.characteristic_polynomial().factor()
+        res = []
+        for k in range(len(fac)):
+            pol = fac[k][0]
+            print("Found eigenvalue with minimal polynomial {}".format(pol))
+            F = NumberField(pol, "a")
+            B = F.integral_basis()
+            N = Matrix(F, M) - F.gen()
+            V = N.left_kernel().basis()
+            assert len(V) == 1, "Should find exactly one eigenvector"
+            v = V[0].denominator() * V[0]; #coordinates of v are integers in F.
+            print("Found eigenvector {}".format(v))
+
+            QQ_basis = []
+            for l in range(pol.degree()):
+                w = B[l] * v
+                elt = 0
+                for m in range(self.Dimension()):
+                    elt += ZZ(w[m].trace()) * self.basis[m]
+                elt = elt/elt.content()
+                QQ_basis.append(elt)
+            res.append(QQ_basis)
+        self.decomposition = res
+        return res
+
+    def HeckeActionOnEigenvectors(self, q, filename="hecke", log=True):
+        self.WriteDecompositionToFile(filename + ".in")
+        call = ["./hecke.exe", "{}".format(q), filename + ".in", filename + ".out"]
+        run = subprocess.run(call, capture_output=True, check=True)
+        subprocess.run(["rm", filename + ".in"])
+        if log:
+            with open(filename + ".log", "w") as f:
+                f.write(run.stdout.decode("ASCII"))
+
+        res = []
+        D = self.HeckeDecomposition()
+        with open(filename + ".out", "r") as f:
+            for i in range(len(D)):
+                d = len(D[i])
+                M = Matrix(ZZ, d, d)
+                for k in range(d):
+                    line = f.readline().strip("[]\n").split(" ")
+                    assert len(line) == d, "Line is not of expected length {}".format(d)
+                    for j in range(d):
+                        M[k,j] = ZZ(line[j])
+                res.append(M)
+                f.readline()
+                f.readline()
+        subprocess.run(["rm", filename + ".out"])
+        return res

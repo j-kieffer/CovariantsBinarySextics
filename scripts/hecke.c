@@ -218,8 +218,8 @@ void hecke_coset(fmpz_mat_t m, slong k, slong p)
     else
     {
         /* Case 4 */
-        a = (k - 1 - n_pow(p, 3) - n_pow(p, 2)) % p;
-        b = ((k - 1 - n_pow(p, 3) - n_pow(p, 2))/p) % p;
+        a = (k - 1 - n_pow(p, 3) - p) % p;
+        b = ((k - 1 - n_pow(p, 3) - p)/p) % p;
         fmpz_set_si(fmpz_mat_entry(m, 0, 0), p);
         fmpz_set_si(fmpz_mat_entry(m, 1, 0), -a);
         fmpz_set_si(fmpz_mat_entry(m, 1, 1), 1);
