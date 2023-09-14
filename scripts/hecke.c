@@ -2,7 +2,7 @@
 gcc -I/home/jean/install/include/flint -I/home/jean/install/include hecke.c -L/home/jean/install/lib -lflint -lgmp -o hecke.exe
 
 Usage:
-hecke.exe q filename_in filename_out
+./hecke.exe q filename_in filename_out
 
 Each line in filename_in is a covariant encoded as a multivariate polynomial in
 Co16, etc. with integral coefficients. Consecutive lines are elements in the
@@ -188,8 +188,8 @@ void hecke_coset(fmpz_mat_t m, slong k, slong p)
     else if (k < 1 + n_pow(p, 3))
     {
         a = (k - 1) % p;
-        b = ((k - 1)/p) % p;
-        c = ((k - 1)/p^2) % p;
+        b = ((k - 1) / p) % p;
+        c = ((k - 1) / n_pow(p, 2)) % p;
         for (i = 0; i < 2; i++)
         {
             fmpz_one(fmpz_mat_entry(m, i, i));
@@ -601,7 +601,7 @@ int hecke_attempt(fmpz_mat_struct* mats, fmpz_mpoly_struct** pols,
             acb_siegel_cocycle(&stars[nb * k + j], mat, &tau[k], prec);
             acb_siegel_transform(w, mat, &tau[k], prec);
             acb_theta_g2_basic_covariants(&basic_covs[26 * (nb + 1) * k + 26 * (1 + j)],
-                &tau[k], prec);
+                w, prec);
             
             acb_mat_printd(w, 5);
         }
