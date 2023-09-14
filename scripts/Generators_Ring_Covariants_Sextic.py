@@ -79,3 +79,7 @@ def GetRingGeneratorsCov():
     DCov = {LCo[i] : LCov[i] for i in range(len(LCo))}
     
     return LW, LCo, LCov, DCov
+
+def RingOfCovariants():
+    LW, LCo, LCov, DCov = GetRingGeneratorsCov()
+    return LCo[0].parent()
