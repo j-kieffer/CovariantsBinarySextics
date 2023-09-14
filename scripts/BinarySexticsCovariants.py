@@ -210,7 +210,8 @@ class BinarySexticsCovariants(SageObject):
         add_exps = reduce(lambda x,y: x.union(y), [Set(coeff_ring(check_rels[i].coefficient([0,self.b])).exponents()) for
                                                    i in range(len(maybe_rels)) if check_rels[i] != 0], Set([]))
         all_exps = exps[:maybe_enough_coeffs] + add_exps[:len(add_exps)]
-        coeffs_mat = Matrix([[ZZ(lc.coefficient(e)) for e in all_exps] for lc in lcs])
+        # coeffs_mat = Matrix([[ZZ(lc.coefficient(e)) for e in all_exps] for lc in lcs])
+        coeffs_mat = Matrix([[QQ(lc.coefficient(e)) for e in all_exps] for lc in lcs])
         C_basis = [covs[i][0] for i in coeffs_mat.pivot_rows()]
         # assert len(C_basis) == self.Dimension()
         return C_basis
