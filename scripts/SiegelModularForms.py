@@ -40,8 +40,11 @@ class SMF(SageObject):
         self.prec = 0
         self.basis = None
         self.decomposition = None
+        self.fields = None
         if j == 0:
-            self.SetBasis(SMFPrecomputedScalarBasis(k)) #may be None
+            B = SMFPrecomputedScalarBasis(k)
+            if not B is None:
+                self.SetBasis(B)
 
     def SetBasis(self, L):
         CRing = RingOfCovariants()
@@ -181,19 +184,20 @@ class SMF(SageObject):
         if not self.decomposition is None:
             return self.decomposition
         M = self.HeckeAction(2)
-        print("Matrix of Hecke action at 2:\n{}".format(M))
+        #print("Matrix of Hecke action at 2:\n{}".format(M))
         fac = M.characteristic_polynomial().factor()
         res = []
+        fields = []
         for k in range(len(fac)):
             pol = fac[k][0]
-            print("Found eigenvalue with minimal polynomial {}".format(pol))
+            #print("Found eigenvalue with minimal polynomial {}".format(pol))
             F = NumberField(pol, "a")
             B = F.integral_basis()
             N = Matrix(F, M) - F.gen()
             V = N.left_kernel().basis()
             assert len(V) == 1, "Should find exactly one eigenvector"
             v = V[0].denominator() * V[0]; #coordinates of v are integers in F.
-            print("Found eigenvector {}".format(v))
+            #print("Found eigenvector {}".format(v))
 
             QQ_basis = []
             for l in range(pol.degree()):
@@ -204,8 +208,21 @@ class SMF(SageObject):
                 elt = elt/elt.content()
                 QQ_basis.append(elt)
             res.append(QQ_basis)
+
+            #Get polredabs
+            if F.degree() == 1:
+                fields.append(QQ)
+            else:
+                pol = pari.polredabs(pol)
+                fields.append(NumberField(pol))
         self.decomposition = res
+        self.fields = fields
         return res
+
+    def HeckeFields(self):
+        if not self.decomposition is None:
+            self.HeckeDecomposition()
+        return self.HeckeFields
 
     def HeckeActionOnEigenvectors(self, q, filename="hecke", log=True):
         self.WriteDecompositionToFile(filename + ".in")
