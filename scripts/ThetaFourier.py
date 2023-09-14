@@ -297,32 +297,9 @@ def rat_func_to_pow_ser(f):
     return R(f.numerator())/R(f.denominator())
 
 def exponential(prec):
-    # res = R(0)
-    # s = R.gen()
-    # for n in range(prec):
-    #    res += 1/factorial(n) * s**n
     Rs = PowerSeriesRing(QQ, "s", default_prec=prec)
     s = Rs.gen()
     return exp(s)
 
-def get_taylor_exp(chi, prec):
-    exps = list(chi.dict().keys())
-    Rs = PowerSeriesRing(QQ, "s")
-    s = Rs.gen()
-    Rsq = PowerSeriesRing(Rs, ["q1", "q2"])
-    q1, q2 = Rsq.gens()
-    Rsqxy = PolynomialRing(Rsq, ["x", "y"])
-    x, y = Rsqxy.gens()
-    res = Rsqxy(0)
-    exp_s = exponential(prec)
-    for e in exps:
-        mon = chi.dict()[e]
-        mon_exps = list(mon.dict().keys())
-        res_mon = Rsq(0)
-        for mon_exp in mon_exps:
-            f = mon.dict()[mon_exp]    
-            f_pow = f.numerator().subs(exp_s) / f.denominator().subs(exp_s)
-            res_mon += f_pow * q1**mon_exp[0] * q2**mon_exp[1]
-        res += res_mon * x**e[0] * y**e[1]
-    return res
+
     
