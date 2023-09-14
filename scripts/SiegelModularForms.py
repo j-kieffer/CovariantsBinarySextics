@@ -64,26 +64,21 @@ class SMF(SageObject):
         U = vals[0].parent()
         a = U.gens()
         g_comps = [[g.dict().get(exp,U(0)) for exp in g_exps[i]] for i,g in enumerate(gens_exp)]
-        b_comps = [[b.dict().get(exp,U(0)) for exp in b_exps] for b in basis_expanded]
         sub_dict = {a[i] : t_chi_comps[i] for i in range(7)}
-        b_comps_expanded = [[R(b_c.subs(sub_dict)) for b_c in b_comps_s] for b_comps_s in b_comps]
         g_comps_expanded = [[R(g_c.subs(sub_dict)) for g_c in g_comps_s] for g_comps_s in g_comps]
         g_c_e = [VectorFJexp([g_exps[l], g_comps_expanded[l]]) for l in range(len(g_exps))]
         g_sub_dict = {gens[i] : g_c_e[i] for i in range(len(gens))}
         b_comps_exp = [b.subs(g_sub_dict) for b in basis]
-        b_comps_exp2 = [VectorFJexp([b_exps, b_comps_s]) for b_comps_s in b_comps_expanded]
-        # assert all([b_comps_exp[i].__eq__(b_comps_exp2[i]) for i in range(len(b_comps_exp))])
-        assert b_comps_exp == b_comps_exp2
         print("Done!")
         print("Solving linear system...")
-        qexps = reduce(lambda x,y: x.union(y), [reduce(lambda x,y: x.union(y), [Set(list(b_c.coeffs.keys())) for b_c in b_c_e]) for b_c_e in b_comps_expanded])
+        qexps = reduce(lambda x,y: x.union(y), [reduce(lambda x,y: x.union(y), [Set(list(b_c.coeffs.keys())) for b_c in b_c_e.coeffs.values()]) for b_c_e in b_comps_exp])
         ker = VectorSpace(QQ, len(basis))
         for qexp in qexps:
             for i in range(len(b_exps)):
                 all_vals = []
                 all_coeffs = []
-                for j, b_c_e in enumerate(b_comps_expanded):
-                    b_c = b_c_e[i]
+                for j, b_c_e in enumerate(b_comps_exp):
+                    b_c = b_c_e.coeffs[b_exps[i]]
                     mon = b_c.coeffs.get(qexp, FJexp(0))
                     v = mon.valuation()
                     coeffs = list(mon)
