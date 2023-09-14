@@ -70,9 +70,9 @@ class SMF(SageObject):
         b_comps_expanded = [[R(b_c.subs(sub_dict))+O(qb[0]**prec) for b_c in b_comps_s] for b_comps_s in b_comps]
 #        g_comps_expanded = [[R(g_c.subs(sub_dict))+O(qb[0]**prec) for g_c in g_comps_s] for g_comps_s in g_comps]
 #        g_c_e = [sum([g_comps_expanded[l][i]*x**g_exps[l][i][0] * y**g_exps[l][i][1] for i
-                      in range(len(g_exps[l]))]) for l in range(len(g_exps))]
+#                      in range(len(g_exps[l]))]) for l in range(len(g_exps))]
 #        g_sub_dict = {gens[i] : g_c_e[i] for i in range(len(gens))}
-        b_comps_exp = [b.subs(g_sub_dict) for b in basis]
+#        b_comps_exp = [b.subs(g_sub_dict) for b in basis]
         print("Done!")
         print("Solving linear system...")
         qexps = reduce(lambda x,y: x.union(y), [reduce(lambda x,y: x.union(y), [Set(list(b_c.dict().keys())) for b_c in b_c_e]) for b_c_e in b_comps_expanded])
