@@ -143,7 +143,8 @@ class FJexp(SageObject):
 
     def __radd__(self, r):
         ret = FJexp(self)
-        ret.coeffs[ETuple([0,0])] = ret.coeffs.get(ETuple([0,0]), 0) + r
+        R = list(self.coeffs.values())[0].parent()
+        ret.coeffs[ETuple([0,0])] = ret.coeffs.get(ETuple([0,0]), R(0)) + r
         ret.exps = sorted(ret.coeffs.keys())
         ret.min_val = 0
         return ret
