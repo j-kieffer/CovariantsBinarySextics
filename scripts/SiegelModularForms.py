@@ -10,6 +10,8 @@ from sage.all import NumberField, pari
 from sage.sets.set import Set
 
 from BinarySexticsCovariants import BinarySexticsCovariants as BSC
+from DimFormulaSMFScalarValuedLevel1WithoutCharacter import dim_splitting_SV_All_weight
+from DimFormulaSMFVectorValuedLevel1WithoutCharacter import dim_splitting_VV_All_weight
 from FJexp import VectorFJexp, FJexp
 from ThetaFourier import get_chi6m2
 from Generators_Ring_Covariants_Sextic import RingOfCovariants
@@ -39,6 +41,7 @@ class SMF(SageObject):
         self.k = k
         self.j = j
         self.prec = 0
+        self.dim = None
         self.basis = None
         self.decomposition = None
         self.fields = None
@@ -51,6 +54,36 @@ class SMF(SageObject):
         CRing = RingOfCovariants()
         self.basis = [CRing(x) for x in L]
 
+    def Dimension(self):
+        if (self.dim is None):
+            if (self.j == 0):
+                self.dim = dim_splitting_SV_All_weight(self.k)['total_dim']
+            else:
+                self.dim = dim_splitting_VV_All_weight(self.k, self.j)['total_dim']
+        return self.dim
+
+    def _subs_chi(bsc, basis, chi, t_chi):
+        basis_expanded = [b.subs(bsc.DCov) for b in basis]
+        exps = list(chi.dict().keys())
+        t_chi_vals = list(t_chi.coeffs.values())
+        R = t_chi_vals[0].parent()
+        t_chi_comps = [t_chi.coeffs.get(exp, R(0)) for exp in exps]
+        assert len(t_chi_comps) == 7
+        gens = list(reduce(lambda x,y:x.union(y), [Set(b.variables()) for b in basis]))
+        gens_exp = [g.subs(bsc.DCov) for g in gens]
+        g_exps = [list(g_exp.dict().keys()) for g_exp in gens_exp]
+        b_exps = list(basis_expanded[0].dict().keys())
+        vals = list(basis_expanded[0].dict().values())
+        U = vals[0].parent()
+        a = U.gens()
+        g_comps = [[g.dict().get(exp,U(0)) for exp in g_exps[i]] for i,g in enumerate(gens_exp)]
+        sub_dict = {a[i] : t_chi_comps[i] for i in range(7)}
+        g_comps_expanded = [[R(g_c.subs(sub_dict)) for g_c in g_comps_s] for g_comps_s in g_comps]
+        g_c_e = [VectorFJexp([g_exps[l], g_comps_expanded[l]]) for l in range(len(g_exps))]
+        g_sub_dict = {gens[i] : g_c_e[i] for i in range(len(gens))}
+        b_comps_exp = [b.subs(g_sub_dict) for b in basis]
+        return b_comps_exp, b_exps
+    
     def GetBasis(self, prec=3, taylor_prec=20):
         if (not self.basis is None and prec <= self.prec):
             return self.basis
@@ -79,25 +112,7 @@ class SMF(SageObject):
 
         # Substitution
         print("Substituting chi_6_m_2...")
-        basis_expanded = [b.subs(bsc.DCov) for b in basis]
-        exps = list(chi.dict().keys())
-        t_chi_vals = list(t_chi.coeffs.values())
-        R = t_chi_vals[0].parent()
-        t_chi_comps = [t_chi.coeffs.get(exp, R(0)) for exp in exps]
-        assert len(t_chi_comps) == 7
-        gens = list(reduce(lambda x,y:x.union(y), [Set(b.variables()) for b in basis]))
-        gens_exp = [g.subs(bsc.DCov) for g in gens]
-        g_exps = [list(g_exp.dict().keys()) for g_exp in gens_exp]
-        b_exps = list(basis_expanded[0].dict().keys())
-        vals = list(basis_expanded[0].dict().values())
-        U = vals[0].parent()
-        a = U.gens()
-        g_comps = [[g.dict().get(exp,U(0)) for exp in g_exps[i]] for i,g in enumerate(gens_exp)]
-        sub_dict = {a[i] : t_chi_comps[i] for i in range(7)}
-        g_comps_expanded = [[R(g_c.subs(sub_dict)) for g_c in g_comps_s] for g_comps_s in g_comps]
-        g_c_e = [VectorFJexp([g_exps[l], g_comps_expanded[l]]) for l in range(len(g_exps))]
-        g_sub_dict = {gens[i] : g_c_e[i] for i in range(len(gens))}
-        b_comps_exp = [b.subs(g_sub_dict) for b in basis]
+        b_comps_exp, b_exps = _subs_chi(bsc, basis, chi, t_chi)
         print("Done!")
 
         #Linear algebra
@@ -132,13 +147,13 @@ class SMF(SageObject):
                 ker_mat = mat_coeffs.kernel()
                 ker = ker.intersection(ker_mat)
         print("Done!")
-
+        
         # Take only highest valuations
         self.basis = [sum([b.denominator()*b[i]*basis[i] for i in range(len(basis))]) for b in ker.basis()]
         return self.basis
 
-    def Dimension(self):
-        return len(self.GetBasis())
+    # def Dimension(self):
+    #    return len(self.GetBasis())
 
     def WriteBasisToFile(self, filename):
         with open(filename, "w") as f:
