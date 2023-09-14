@@ -296,10 +296,5 @@ def rat_func_to_pow_ser(f):
     R = PowerSeriesRing(QQ, "u")
     return R(f.numerator())/R(f.denominator())
 
-def exponential(prec):
-    Rs = PowerSeriesRing(QQ, "s", default_prec=prec)
-    s = Rs.gen()
-    return exp(s)
-
 
     
