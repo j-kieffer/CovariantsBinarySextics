@@ -5,10 +5,12 @@ from sage.modules.free_module import VectorSpace
 from sage.rings.big_oh import O
 from sage.rings.infinity import infinity
 from sage.rings.rational_field import QQ
+from sage.rings.integer_ring import ZZ
 from sage.sets.set import Set
 
 from BinarySexticsCovariants import BinarySexticsCovariants as BSC
 from ThetaFourier import get_chi6m2, get_taylor_exp
+import subprocess
 
 class SMF(SageObject):
     r"""
@@ -110,3 +112,38 @@ class SMF(SageObject):
 
     def GetBasis(self):
         return self.basis
+
+    def Dimension(self):
+        return len(self.basis)
+
+    def WriteBasisToFile(self, filename):
+        with open(filename, "w") as f:
+            B = self.basis
+            d = self.Dimension()
+            for k in range(d):
+                f.write(str(B[k]))
+                if k < d - 1:
+                    f.write("\n")
+
+    # This computes the Hecke action on full basis up to some cofactor
+    def HeckeAction(self, q, filename="hecke", log=True):
+        self.WriteBasisToFile(filename + ".in")
+        call = ["./hecke.exe", "{}".format(q), filename + ".in", filename + ".out"]
+        run = subprocess.run(call, capture_output=True, check=True)
+        subprocess.run(["rm", filename + ".in"])
+        if log:
+            with open(filename + ".log", "w") as f:
+                f.write(run.stdout.decode("ASCII"))
+
+        d = self.Dimension()
+        M = Matrix(ZZ, d, d)
+        with open(filename + ".out", "r") as f:
+            for k in range(d):
+                line = f.readline().strip("[]\n").split(" ")
+                assert len(line) == d, "Line is not of expected length {}".format(d)
+                for j in range(d):
+                    M[k,j] = ZZ(line[j])
+        subprocess.run(["rm", filename + ".out"])
+        return M
+
+    

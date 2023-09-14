@@ -42,6 +42,8 @@ void parse_integers(slong* nb_spaces, slong** dims, const char* filename_in)
         getline(&str, &nb, file_in);
         str[strcspn(str, "\n")] = 0; /* remove final newline */
         nb = strcspn(str, "");
+        /* flint_printf("(parse_integers) read line with nb = %wd, nb_prev = %wd\n", nb, nb_prev);
+           flint_printf("line: %s\n", str); */
         flint_free(str);
 
         if (nb > 0 && nb_prev == 0)
@@ -381,9 +383,10 @@ int hecke_act_on_space(fmpz_mat_t mat, const fmpz_mpoly_struct* pols, slong dim,
     acb_poly_t u, v;
     acb_t f;
     arf_t rad;
+    fmpz_t den;
     slong j, k, l;
     slong k0, j0;
-    int res = 1;
+    int res = 0;
 
     acb_mat_init(s, dim, dim);
     acb_mat_init(t, dim, dim);
@@ -392,6 +395,7 @@ int hecke_act_on_space(fmpz_mat_t mat, const fmpz_mpoly_struct* pols, slong dim,
     acb_poly_init(v);
     acb_init(f);
     arf_init(rad);
+    fmpz_init(den);
 
     /* Get weight */
     get_mf_weight(&k0, &j0, &pols[0], ctx);
@@ -403,11 +407,6 @@ int hecke_act_on_space(fmpz_mat_t mat, const fmpz_mpoly_struct* pols, slong dim,
         for (j = 0; j < dim; j++)
         {
             acb_theta_g2_covariant(u, &pols[k], &basic_covs[26 * (nb + 1) * j], ctx, prec);
-
-            flint_printf("value of covariant %wd at point %wd:\n", k, j);
-            acb_poly_printd(u, 5);
-            flint_printf("\n");
-
             acb_poly_get_coeff_acb(acb_mat_entry(s, k, j), u, 0);
         }
     }
@@ -424,11 +423,6 @@ int hecke_act_on_space(fmpz_mat_t mat, const fmpz_mpoly_struct* pols, slong dim,
                 acb_theta_g2_covariant(v, &pols[k],
                     &basic_covs[26 * (nb + 1) * j + 26 * (1 + l)], ctx, prec);
                 hecke_slash(v, &stars[nb * j + l], v, k0, j0, prec);
-
-                flint_printf("l = %wd, slash:\n", l);
-                acb_poly_printd(v, 5);
-                flint_printf("\n");
-                
                 acb_poly_add(u, u, v, prec);
             }
             acb_set_si(f, q);
@@ -444,9 +438,9 @@ int hecke_act_on_space(fmpz_mat_t mat, const fmpz_mpoly_struct* pols, slong dim,
             acb_poly_get_coeff_acb(acb_mat_entry(t, k, j), u, 0);
         }
     }
-    flint_printf("(hecke_act_on_space) source, target:\n");
-    acb_mat_printd(s, 5);
-    acb_mat_printd(t, 5);
+    /* flint_printf("(hecke_act_on_space) source, target:\n");
+       acb_mat_printd(s, 5);
+       acb_mat_printd(t, 5); */
 
     acb_mat_inv(s, s, prec);
     acb_mat_mul(hecke, t, s, prec);
@@ -454,25 +448,39 @@ int hecke_act_on_space(fmpz_mat_t mat, const fmpz_mpoly_struct* pols, slong dim,
     acb_mat_printd(hecke, 5);
 
     /* Round to integral matrix */
-    for (j = 0; (j < dim) && res; j++)
+    for (l = 0; (l < FLINT_MAX(10, n_sqrt(prec))) && !res; l++)
     {
-        for (k = 0; (k < dim) && res; k++)
+        res = 1;
+        fmpz_fac_ui(den, l + 1);
+        flint_printf("Trying cofactor ");
+        fmpz_print(den);
+        flint_printf("\n");
+        for (j = 0; (j < dim) && res; j++)
         {
-            res = acb_get_unique_fmpz(fmpz_mat_entry(mat, j, k),
-                acb_mat_entry(hecke, j, k));
-            if (!res)
+            for (k = 0; (k < dim) && res; k++)
             {
-                acb_get_rad_ubound_arf(rad, acb_mat_entry(hecke, j, k), prec);
-                arf_mul_2exp_si(rad, rad, 4);
-                if (arf_cmp_si(rad, 1) < 0)
+                acb_mul_fmpz(f, acb_mat_entry(hecke, j, k), den, prec);
+                if (!arb_contains_zero(acb_imagref(f)))
                 {
-                    flint_printf("(hecke_act_on_space) Error: not integral\n");
-                    acb_printd(acb_mat_entry(hecke, j, k), 100);
+                    flint_printf("(hecke_act_on_space) Error: not real\n");
+                    acb_printd(f, 10);
                     flint_printf("\n");
                     flint_abort();
                 }
+                acb_get_rad_ubound_arf(rad, acb_mat_entry(hecke, j, k), prec);
+                arf_mul_2exp_si(rad, rad, 10);
+                res = (arf_cmp_si(rad, 1) < 0)
+                    && acb_get_unique_fmpz(fmpz_mat_entry(mat, j, k), f);
             }
         }
+    }
+    if (res)
+    {
+        flint_printf("Success!\n");
+    }
+    else
+    {
+        flint_printf("Fail at precision %wd, increase precision\n", prec);
     }
 
     acb_mat_clear(s);
@@ -482,13 +490,14 @@ int hecke_act_on_space(fmpz_mat_t mat, const fmpz_mpoly_struct* pols, slong dim,
     acb_poly_clear(v);
     acb_clear(f);
     arf_clear(rad);
+    fmpz_clear(den);
     return res;
 }
 
 int hecke_attempt(fmpz_mat_struct* mats, fmpz_mpoly_struct** pols,
     slong* dims, slong nb_spaces, slong q, const fmpz_mpoly_ctx_t ctx, slong prec)
 {
-    flint_printf("(hecke_attempt) attempt at precision %wd\n", prec);
+    flint_printf("\n(hecke_attempt) attempt at precision %wd\n", prec);
 
     flint_rand_t state;
     slong max_dim;
@@ -555,7 +564,7 @@ int hecke_attempt(fmpz_mat_struct* mats, fmpz_mpoly_struct** pols,
     acb_mat_init(w, 2, 2);
 
     /* Choose base points */
-    flint_printf("(hecke_attempt) generating base points\n");
+    flint_printf("(hecke_attempt) generating %wd base points\n", max_dim);
     for (k = 0; k < max_dim; k++)
     {
         /* Imaginary part is [1 + t, 1/4; 1/4, 1 + t] with 0<=t<=1 */
@@ -575,8 +584,7 @@ int hecke_attempt(fmpz_mat_struct* mats, fmpz_mpoly_struct** pols,
         arb_set(arb_mat_entry(x, 1, 0), arb_mat_entry(x, 0, 1));
         arf_urandom(arb_midref(arb_mat_entry(x, 1, 1)), state, prec, ARF_RND_NEAR);
         acb_mat_set_real_imag(&tau[k], x, y);
-
-        acb_mat_printd(&tau[k], 5);
+        /* acb_mat_printd(&tau[k], 5); */
     }
 
     /* Get basic covariants at base points */
@@ -593,7 +601,6 @@ int hecke_attempt(fmpz_mat_struct* mats, fmpz_mpoly_struct** pols,
     for (j = 0; j < nb; j++)
     {
         (is_T1 ? hecke_T1_coset(mat, j, q) : hecke_coset(mat, j, q));
-        
         fmpz_mat_print_pretty(mat);
         flint_printf("\n");
         for (k = 0; k < max_dim; k++)
@@ -602,15 +609,14 @@ int hecke_attempt(fmpz_mat_struct* mats, fmpz_mpoly_struct** pols,
             acb_siegel_transform(w, mat, &tau[k], prec);
             acb_theta_g2_basic_covariants(&basic_covs[26 * (nb + 1) * k + 26 * (1 + j)],
                 w, prec);
-            
-            acb_mat_printd(w, 5);
+            /* acb_mat_printd(w, 5); */
         }
     }
 
     /* Get integral matrix for each space */
     for (k = 0; (k < nb_spaces) && res; k++)
     {
-        flint_printf("(hecke_attempt) getting matrix on space number %wd of dimension %wd\n",
+        flint_printf("\n(hecke_attempt) getting matrix on space number %wd of dimension %wd\n",
             k, dims[k]);
         res = hecke_act_on_space(&mats[k], pols[k], dims[k], basic_covs, stars,
             nb, q, is_T1, ctx, prec);
@@ -655,9 +661,11 @@ int main(int argc, const char *argv[])
 
     if (argc != 4)
     {
-        flint_printf("Error: expected 3 arguments (p or p^2, filename_in, filename_out)\n");
+        flint_printf("Error: expected 3 arguments (p or p^2, filename_in, filename_out), got %wd\n", argc - 1);
         flint_abort();
     }
+
+    flint_printf("(hecke) Call with q = %s, input: %s, output: %s\n", argv[1], argv[2], argv[3]);
 
     fmpz_mpoly_ctx_init(ctx, 26, ORD_LEX);
 
