@@ -83,6 +83,42 @@ class SMF(SageObject):
         g_sub_dict = {gens[i] : g_c_e[i] for i in range(len(gens))}
         b_comps_exp = [b.subs(g_sub_dict) for b in basis]
         return b_comps_exp, b_exps
+
+    def _solve_linear_system(basis, b_comps_exp, b_exps):
+        qexps = reduce(lambda x,y: x.union(y),
+                       [reduce(lambda x,y: x.union(y),
+                               [Set(list(b_c.coeffs.keys()))
+                                for b_c in b_c_e.coeffs.values()])
+                        for b_c_e in b_comps_exp])
+        ker = VectorSpace(QQ, len(basis))
+        for qexp in qexps:
+            for i in range(len(b_exps)):
+                all_vals = []
+                all_coeffs = []
+                for j, b_c_e in enumerate(b_comps_exp):
+                    b_c = b_c_e.coeffs[b_exps[i]]
+                    mon = b_c.coeffs.get(qexp, FJexp(0))
+                    v = mon.valuation()
+                    coeffs = list(mon)
+                    all_vals.append(v)
+                    if (v >= 0):
+                        all_coeffs.append([])
+                    else:
+                        all_coeffs.append(coeffs[:-v])
+                min_val = min(all_vals)
+                if (min_val < 0):
+                    max_len = max([len(all_coeffs[j]) + all_vals[j] for j in range(len(all_vals)) if all_vals[j] < 0])
+                    for j in range(len(all_vals)):
+                        v = all_vals[j]
+                        if (v >= 0):
+                            v = max_len
+                        all_coeffs[j] = [0 for l in range(v-min_val)] + all_coeffs[j]
+                max_len = max([len(a) for a in all_coeffs])
+                all_coeffs = [a + [0 for j in range(max_len-len(a))] for a in all_coeffs]
+                mat_coeffs = Matrix(all_coeffs)
+                ker_mat = mat_coeffs.kernel()
+                ker = ker.intersection(ker_mat)
+        return ker
     
     def GetBasis(self, prec=3, taylor_prec=20):
         if (not self.basis is None and prec <= self.prec):
@@ -112,40 +148,12 @@ class SMF(SageObject):
 
         # Substitution
         print("Substituting chi_6_m_2...")
-        b_comps_exp, b_exps = _subs_chi(bsc, basis, chi, t_chi)
+        b_comps_exp, b_exps = SMF._subs_chi(bsc, basis, chi, t_chi)
         print("Done!")
 
         #Linear algebra
         print("Solving linear system...")
-        qexps = reduce(lambda x,y: x.union(y), [reduce(lambda x,y: x.union(y), [Set(list(b_c.coeffs.keys())) for b_c in b_c_e.coeffs.values()]) for b_c_e in b_comps_exp])
-        ker = VectorSpace(QQ, len(basis))
-        for qexp in qexps:
-            for i in range(len(b_exps)):
-                all_vals = []
-                all_coeffs = []
-                for j, b_c_e in enumerate(b_comps_exp):
-                    b_c = b_c_e.coeffs[b_exps[i]]
-                    mon = b_c.coeffs.get(qexp, FJexp(0))
-                    v = mon.valuation()
-                    coeffs = list(mon)
-                    all_vals.append(v)
-                    if (v >= 0):
-                        all_coeffs.append([])
-                    else:
-                        all_coeffs.append(coeffs[:-v])
-                min_val = min(all_vals)
-                if (min_val < 0):
-                    max_len = max([len(all_coeffs[j]) + all_vals[j] for j in range(len(all_vals)) if all_vals[j] < 0])
-                    for j in range(len(all_vals)):
-                        v = all_vals[j]
-                        if (v >= 0):
-                            v = max_len
-                        all_coeffs[j] = [0 for l in range(v-min_val)] + all_coeffs[j]
-                max_len = max([len(a) for a in all_coeffs])
-                all_coeffs = [a + [0 for j in range(max_len-len(a))] for a in all_coeffs]
-                mat_coeffs = Matrix(all_coeffs)
-                ker_mat = mat_coeffs.kernel()
-                ker = ker.intersection(ker_mat)
+        ker = SMF._solve_linear_system(basis, b_comps_exp, b_exps)
         print("Done!")
         
         # Take only highest valuations
