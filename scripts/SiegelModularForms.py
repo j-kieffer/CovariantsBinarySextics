@@ -10,6 +10,7 @@ from sage.all import NumberField
 from sage.sets.set import Set
 
 from BinarySexticsCovariants import BinarySexticsCovariants as BSC
+from Generators_Ring_Covariants_Sextic import RingOfCovariants
 from ThetaFourier import get_chi6m2, get_taylor_exp
 import subprocess
 
@@ -32,8 +33,24 @@ class SMF(SageObject):
     prec = 0
     chi = 0
     t_chi = 0
-    
-    def __init__(self, k, j, prec=3, taylor_prec=20):
+
+    def __init__(self, k, j):
+        self.k = k
+        self.j = j
+        self.prec = 0
+        self.basis = None
+        self.decomposition = None
+
+    def SetBasis(self, L):
+        CRing = RingOfCovariants()
+        self.basis = [CRing(x) for x in L]
+
+    def GetBasis(self, prec=3, taylor_prec=20):
+        if not self.basis is None:
+            return self.basis
+
+        k = self.k
+        j = self.j
         self.prec = prec
         print("Creating basis of covariants...")
         bsc = BSC(k+j//2,j)
@@ -41,18 +58,20 @@ class SMF(SageObject):
         print("Done!")
         if (len(basis) == 0):
             self.basis = []
-            return
+            return self.basis
+
         if (SMF.prec < self.prec):
-            print("Computing expansion of chi_6_m_2...")
+            print("Recomputing expansion of chi_6_m_2 to precision {}...".format(prec))
             SMF.chi = get_chi6m2(4*self.prec)
             SMF.prec = self.prec
             print("Done!")
-            # print("Producing Taylor expansion around s = 0...")
-            # SMF.t_chi = get_taylor_exp(SMF.chi, taylor_prec)
-            # print("Done!")
+
+        # Compute Taylor expansion: this is cheap.
         q = SMF.chi.parent().base().gens()
         chi = sum([(SMF.chi.monomial_coefficient(m) + O(q[0]**prec))*m for m in SMF.chi.monomials()])
         t_chi = get_taylor_exp(chi, taylor_prec)
+
+        # Substitution
         print("Substituting chi_6_m_2...")
         basis_expanded = [b.subs(bsc.DCov) for b in basis]
         exps = list(chi.dict().keys())
@@ -72,6 +91,8 @@ class SMF(SageObject):
         qb = t_chi.parent().base().gens()
         b_comps_expanded = [[R(b_c.subs(sub_dict))+O(qb[0]**prec) for b_c in b_comps_s] for b_comps_s in b_comps]
         print("Done!")
+
+        #Linear algebra
         print("Solving linear system...")
         qexps = reduce(lambda x,y: x.union(y), [reduce(lambda x,y: x.union(y), [Set(list(b_c.dict().keys())) for b_c in b_c_e]) for b_c_e in b_comps_expanded])
         ker = VectorSpace(QQ, len(basis))
@@ -103,16 +124,13 @@ class SMF(SageObject):
                 ker_mat = mat_coeffs.kernel()
                 ker = ker.intersection(ker_mat)
         print("Done!")
+
         # Take only highest valuations
         self.basis = [sum([b.denominator()*b[i]*basis[i] for i in range(len(basis))]) for b in ker.basis()]
-        # This is not computed yet.
-        self.decomposition = None
-
-    def GetBasis(self):
         return self.basis
 
     def Dimension(self):
-        return len(self.basis)
+        return len(self.GetBasis())
 
     def WriteBasisToFile(self, filename):
         with open(filename, "w") as f:
