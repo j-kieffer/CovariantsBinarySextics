@@ -333,6 +333,7 @@ void hecke_slash(acb_poly_t im, const acb_mat_t star, const acb_poly_t val,
     acb_mat_t inv;
     acb_t a;
     slong i;
+    int b;
 
     acb_mat_init(inv, 2, 2);
     acb_poly_init(x);
@@ -342,7 +343,11 @@ void hecke_slash(acb_poly_t im, const acb_mat_t star, const acb_poly_t val,
     acb_poly_init(u);
     acb_init(a);
 
-    acb_mat_inv(inv, star, prec);
+    b = acb_mat_inv(inv, star, prec);
+    if (!b)
+    {
+        acb_mat_indeterminate(inv);
+    }
     acb_poly_set_coeff_acb(x, 0, acb_mat_entry(inv, 1, 0));
     acb_poly_set_coeff_acb(x, 1, acb_mat_entry(inv, 0, 0));
     acb_poly_set_coeff_acb(y, 0, acb_mat_entry(inv, 1, 1));
@@ -556,10 +561,13 @@ int hecke_act_on_space(fmpq_mat_t mat, const fmpz_mpoly_struct* pols, slong dim,
        acb_mat_printd(s, 5);
        acb_mat_printd(t, 5); */
 
-    acb_mat_inv(s, s, prec);
+    res = acb_mat_inv(s, s, prec);
     acb_mat_mul(hecke, t, s, prec);
-    flint_printf("(hecke_act_on_space) found Hecke matrix:\n");
-    acb_mat_printd(hecke, 5);
+    if (res)
+    {
+        flint_printf("(hecke_act_on_space) found Hecke matrix:\n");
+        acb_mat_printd(hecke, 5);
+    }
 
     /* Round to integral matrix */
     fmpz_one(den);
@@ -830,7 +838,7 @@ int main(int argc, const char *argv[])
     while (!done)
     {
         done = hecke_attempt(mats, pols, dims, nb_spaces, q, ctx, prec);
-        prec += 100;
+        prec *= 2;
     }
 
     file_out = fopen(argv[3], "w");
