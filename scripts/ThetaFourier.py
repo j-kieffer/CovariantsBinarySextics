@@ -307,9 +307,8 @@ class Chi(SageObject):
         for exp in chi6m2_33_times_lc_mons:
             coeff = chi6m2_33_times_lc[exp]
             coeff_dict = coeff.dict()
-            chi6m2_coeff = coeff.parent()(0)
             for k in coeff_dict.keys():
-                chi6m2_coeff += (coeff_dict[k] / lc_mon ) * r1**(k[0]-lc_exp[0]) * r2**(k[1]-lc_exp[1])
+                chi6m2_coeff = (coeff_dict[k] / lc_mon ) * r1**(k[0]-lc_exp[0]) * r2**(k[1]-lc_exp[1])
                 chi6m2 += chi6m2_coeff * x**(exp[0]) * y**(exp[1])
         chi = change_r_to_q_cov(chi6m2)
         q = chi.parent().base().gens()

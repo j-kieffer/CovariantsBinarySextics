@@ -84,6 +84,36 @@ class SMF(SageObject):
         b_comps_exp = [b.subs(g_sub_dict) for b in basis]
         return b_comps_exp, b_exps
 
+    def _create_coeff_matrix(b_comps_exp, b_exps, qexp, i, up_to_val):
+        Rs = reduce(lambda x,y: x + y,
+                    [reduce(lambda x,y : x + y,
+                            [list(b_c.coeffs.values()) for b_c in b_c_e.coeffs.values()])
+                     for b_c_e in b_comps_exp])[0].parent()
+        all_vals = []
+        all_coeffs = []
+        for b_c_e in b_comps_exp:
+            b_c = b_c_e.coeffs[b_exps[i]]
+            mon = b_c.coeffs.get(qexp, Rs(0))
+            v = mon.valuation()
+            coeffs = list(mon)
+            all_vals.append(v)
+            if (v >= up_to_val):
+                all_coeffs.append([])
+            else:
+                all_coeffs.append(coeffs[:up_to_val-v])
+        min_val = min(all_vals)
+        if (min_val < up_to_val):
+            max_len = max([len(all_coeffs[j]) + all_vals[j] for j in range(len(all_vals)) if all_vals[j] < up_to_val])
+            for j in range(len(all_vals)):
+                v = all_vals[j]
+                if (v >= up_to_val):
+                    v = max_len
+                all_coeffs[j] = [0 for l in range(v-min_val)] + all_coeffs[j]
+        max_len = max([len(a) for a in all_coeffs])
+        all_coeffs = [a + [0 for j in range(max_len-len(a))] for a in all_coeffs]
+        mat_coeffs = Matrix(all_coeffs)
+        return mat_coeffs
+    
     def _solve_linear_system(V, b_comps_exp, b_exps, up_to_val=0):
         ker = V
         qexps = reduce(lambda x,y: x.union(y),
@@ -91,35 +121,9 @@ class SMF(SageObject):
                                [Set(list(b_c.coeffs.keys()))
                                 for b_c in b_c_e.coeffs.values()])
                         for b_c_e in b_comps_exp])
-        Rs = reduce(lambda x,y: x + y,
-                    [reduce(lambda x,y : x + y,
-                            [list(b_c.coeffs.values()) for b_c in b_c_e.coeffs.values()])
-                     for b_c_e in b_comps_exp])[0].parent()
         for qexp in qexps:
             for i in range(len(b_exps)):
-                all_vals = []
-                all_coeffs = []
-                for b_c_e in b_comps_exp:
-                    b_c = b_c_e.coeffs[b_exps[i]]
-                    mon = b_c.coeffs.get(qexp, Rs(0))
-                    v = mon.valuation()
-                    coeffs = list(mon)
-                    all_vals.append(v)
-                    if (v >= up_to_val):
-                        all_coeffs.append([])
-                    else:
-                        all_coeffs.append(coeffs[:-v])
-                min_val = min(all_vals)
-                if (min_val < up_to_val):
-                    max_len = max([len(all_coeffs[j]) + all_vals[j] for j in range(len(all_vals)) if all_vals[j] < up_to_val])
-                    for j in range(len(all_vals)):
-                        v = all_vals[j]
-                        if (v >= up_to_val):
-                            v = max_len
-                        all_coeffs[j] = [0 for l in range(v-min_val)] + all_coeffs[j]
-                max_len = max([len(a) for a in all_coeffs])
-                all_coeffs = [a + [0 for j in range(max_len-len(a))] for a in all_coeffs]
-                mat_coeffs = Matrix(all_coeffs)
+                mat_coeffs = SMF._create_coeff_matrix(b_comps_exp, b_exps, qexp, i, up_to_val)
                 ker_mat = mat_coeffs.kernel()
                 ker = ker.intersection(ker_mat)
         return ker
