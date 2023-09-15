@@ -84,13 +84,13 @@ class SMF(SageObject):
         b_comps_exp = [b.subs(g_sub_dict) for b in basis]
         return b_comps_exp, b_exps
 
-    def _solve_linear_system(basis, b_comps_exp, b_exps):
+    def _solve_linear_system(V, b_comps_exp, b_exps):
+        ker = V
         qexps = reduce(lambda x,y: x.union(y),
                        [reduce(lambda x,y: x.union(y),
                                [Set(list(b_c.coeffs.keys()))
                                 for b_c in b_c_e.coeffs.values()])
                         for b_c_e in b_comps_exp])
-        ker = VectorSpace(QQ, len(basis))
         for qexp in qexps:
             for i in range(len(b_exps)):
                 all_vals = []
@@ -126,7 +126,7 @@ class SMF(SageObject):
 
         k = self.k
         j = self.j
-        self.prec = prec
+        
         print("Creating basis of covariants...")
         bsc = BSC(k+j//2,j)
         basis = bsc.GetBasis()
@@ -135,33 +135,44 @@ class SMF(SageObject):
             self.basis = []
             return self.basis
 
-        if (SMF.prec < self.prec):
-            print("Recomputing expansion of chi_6_m_2 to precision {}...".format(prec))
-            SMF.chi = get_chi6m2(4*self.prec)
-            SMF.prec = self.prec
-            print("Done!")
+        V = VectorSpace(QQ, len(basis))
+        ker = V
+        self.prec = prec-1
+        self.s_prec = taylor_prec-10
+        print ("Trying to get to dimension ", self.Dimension())
+        while (ker.dimension() > self.Dimension()):
+            self.prec += 1
+            if (SMF.prec < self.prec):
+                print("Recomputing expansion of chi_6_m_2 to precision {}...".format(self.prec))
+                SMF.chi = get_chi6m2(4*self.prec)
+                SMF.prec = self.prec
+                # !! TODO - this should be inside get_chi6m2
+                q = SMF.chi.parent().base().gens()
+                SMF.chi = sum([(SMF.chi.monomial_coefficient(m) + O(q[0]**prec))*m for m in SMF.chi.monomials()])
+                print("Done!")
 
-        # Compute Taylor expansion: this is cheap.
-        q = SMF.chi.parent().base().gens()
-        chi = sum([(SMF.chi.monomial_coefficient(m) + O(q[0]**prec))*m for m in SMF.chi.monomials()])
-        t_chi = VectorFJexp(chi, taylor_prec)
+            ker_dim = infinity
+            while ((ker.dimension() > self.Dimension()) and (ker.dimension() < ker_dim)):
+                print("Dimension obtained is ", ker.dimension())
+                print("increasing precision in s to {}...".format(self.s_prec))
+                ker_dim = ker.dimension()
+                self.s_prec += 10
+                # Compute Taylor expansion: this is cheap.
+                t_chi = VectorFJexp(SMF.chi, self.s_prec)
 
-        # Substitution
-        print("Substituting chi_6_m_2...")
-        b_comps_exp, b_exps = SMF._subs_chi(bsc, basis, chi, t_chi)
-        print("Done!")
+                # Substitution
+                print("Substituting chi_6_m_2...")
+                b_comps_exp, b_exps = SMF._subs_chi(bsc, basis, SMF.chi, t_chi)
+                print("Done!")
 
-        #Linear algebra
-        print("Solving linear system...")
-        ker = SMF._solve_linear_system(basis, b_comps_exp, b_exps)
-        print("Done!")
+                #Linear algebra
+                print("Solving linear system...")
+                ker = SMF._solve_linear_system(V, b_comps_exp, b_exps)
+                print("Done!")
         
         # Take only highest valuations
         self.basis = [sum([b.denominator()*b[i]*basis[i] for i in range(len(basis))]) for b in ker.basis()]
         return self.basis
-
-    # def Dimension(self):
-    #    return len(self.GetBasis())
 
     def WriteBasisToFile(self, filename):
         with open(filename, "w") as f:
