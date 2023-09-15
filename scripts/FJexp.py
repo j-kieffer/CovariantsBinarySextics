@@ -182,6 +182,7 @@ class VectorFJexp(SageObject):
             self.exps = sorted(list(self.coeffs.keys()))
     
     def _init_from_func_field(self, chi, prec):
+        assert prec >= 2
         self.coeffs = {}
         exps = list(chi.dict().keys())
         Rs = LaurentSeriesRing(QQ, "s")

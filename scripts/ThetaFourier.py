@@ -265,6 +265,7 @@ def change_r_to_q_cov(cov):
     return res
 
 def get_chi6m2(prec):
+    assert prec >= 2
     chi5 = get_chi5(4*prec)
     chi63 = get_chi63(4*prec)
     r1, r2 = chi5.parent().gens()
