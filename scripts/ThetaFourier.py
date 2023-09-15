@@ -3,6 +3,7 @@ from sage.all import GF, ZZ, QQ, prod, PolynomialRing, exp
 from sage.all import FunctionField
 from sage.rings.polynomial.laurent_polynomial_ring import LaurentPolynomialRing
 from sage.rings.power_series_ring import PowerSeriesRing
+from sage.structure.sage_object import SageObject
 from sage.matrix.matrix_space import MatrixSpace
 from sage.misc.functional import sqrt
 from sage.functions.other import ceil, floor
@@ -10,7 +11,7 @@ from sage.rings.big_oh import O
 from sage.rings.number_field.number_field import QuadraticField
 from sage.functions.other import factorial
 
-class ThetaCharacteristic(object):
+class ThetaCharacteristic(SageObject):
 
     M2F2 = MatrixSpace(GF(2), 2)
     def M2F2_sort(a):
@@ -69,7 +70,7 @@ class ThetaCharacteristic(object):
     def __repr__(self):
         return repr(self.mat)
 
-class qExpSiegel(object):
+class qExpSiegel(SageObject):
     def __init__(self, qexp, gens, base):
        self.base = base
        self.gens = gens
@@ -264,32 +265,37 @@ def change_r_to_q_cov(cov):
         res = R(res) + mon
     return res
 
-def get_chi6m2(prec):
-    assert prec >= 2
-    chi5 = get_chi5(4*prec)
-    chi63 = get_chi63(4*prec)
-    r1, r2 = chi5.parent().gens()
-    r12 = chi5.base_ring().gen()
-    lc = (r12**2 - r12**(-2))*r1**4*r2**4
-    chi6m2_33_times_lc = ((chi5 / lc)**(-1) * chi63).dict() # (x^3*y^3)
-    chi6m2_33_times_lc_mons = chi6m2_33_times_lc.keys()
-    lc_exp = [k for k in lc.dict()][0]
-    lc_mon = lc.dict()[lc_exp]
-    R = chi63.parent()
-    chi6m2 = R(0)
-    r1, r2 = chi63.base_ring().gens()
-    x, y = chi63.parent().gens()
-    for exp in chi6m2_33_times_lc_mons:
-        coeff = chi6m2_33_times_lc[exp]
-        coeff_dict = coeff.dict()
-        chi6m2_coeff = coeff.parent()(0)
-        for k in coeff_dict.keys():
-            chi6m2_coeff += (coeff_dict[k] / lc_mon ) * r1**(k[0]-lc_exp[0]) * r2**(k[1]-lc_exp[1])
-        chi6m2 += chi6m2_coeff * x**(exp[0]) * y**(exp[1])
-    chi = change_r_to_q_cov(chi6m2)
-    q = chi.parent().base().gens()
-    chi = sum([(chi.monomial_coefficient(m) + O(q[0]**prec))*m for m in chi.monomials()])
-    return chi
+class Chi(SageObject):
+    def __init__(self,k,j):
+        # at the moment we only support Chi_6_minus_2
+        assert (k == 6) and (j == -2)
+
+    def GetFJexp(self, prec):
+        assert prec >= 2
+        chi5 = get_chi5(4*prec)
+        chi63 = get_chi63(4*prec)
+        r1, r2 = chi5.parent().gens()
+        r12 = chi5.base_ring().gen()
+        lc = (r12**2 - r12**(-2))*r1**4*r2**4
+        chi6m2_33_times_lc = ((chi5 / lc)**(-1) * chi63).dict() # (x^3*y^3)
+        chi6m2_33_times_lc_mons = chi6m2_33_times_lc.keys()
+        lc_exp = [k for k in lc.dict()][0]
+        lc_mon = lc.dict()[lc_exp]
+        R = chi63.parent()
+        chi6m2 = R(0)
+        r1, r2 = chi63.base_ring().gens()
+        x, y = chi63.parent().gens()
+        for exp in chi6m2_33_times_lc_mons:
+            coeff = chi6m2_33_times_lc[exp]
+            coeff_dict = coeff.dict()
+            chi6m2_coeff = coeff.parent()(0)
+            for k in coeff_dict.keys():
+                chi6m2_coeff += (coeff_dict[k] / lc_mon ) * r1**(k[0]-lc_exp[0]) * r2**(k[1]-lc_exp[1])
+                chi6m2 += chi6m2_coeff * x**(exp[0]) * y**(exp[1])
+        chi = change_r_to_q_cov(chi6m2)
+        q = chi.parent().base().gens()
+        chi = sum([(chi.monomial_coefficient(m) + O(q[0]**prec))*m for m in chi.monomials()])
+        return chi
 
 def rat_func_sub(f, u):
     num = f.numerator().subs(u)

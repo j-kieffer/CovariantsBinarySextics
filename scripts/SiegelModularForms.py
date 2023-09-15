@@ -13,7 +13,7 @@ from BinarySexticsCovariants import BinarySexticsCovariants as BSC
 from DimFormulaSMFScalarValuedLevel1WithoutCharacter import dim_splitting_SV_All_weight
 from DimFormulaSMFVectorValuedLevel1WithoutCharacter import dim_splitting_VV_All_weight
 from FJexp import VectorFJexp, FJexp
-from ThetaFourier import get_chi6m2
+from ThetaFourier import Chi
 from Generators_Ring_Covariants_Sextic import RingOfCovariants
 import subprocess
 
@@ -148,11 +148,8 @@ class SMF(SageObject):
             self.prec += 1
             if (SMF.prec < self.prec):
                 print("Recomputing expansion of chi_6_m_2 to precision {}...".format(self.prec))
-                SMF.chi = get_chi6m2(self.prec)
+                SMF.chi = Chi(6,-2).GetFJexp(self.prec)
                 SMF.prec = self.prec
-                # !! TODO - this should be inside get_chi6m2
-                # q = SMF.chi.parent().base().gens()
-                # SMF.chi = sum([(SMF.chi.monomial_coefficient(m) + O(q[0]**prec))*m for m in SMF.chi.monomials()])
                 print("Done!")
 
             ker_dim = infinity
