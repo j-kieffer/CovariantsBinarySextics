@@ -329,56 +329,17 @@ void hecke_T1_coset(fmpz_mat_t m, slong k, slong p)
 void hecke_slash(acb_poly_t im, const acb_mat_t star, const acb_poly_t val,
     slong k, slong j, slong prec)
 {
-    acb_poly_t x, y, res, t, u;
     acb_mat_t inv;
-    acb_t a;
-    slong i;
     int b;
 
     acb_mat_init(inv, 2, 2);
-    acb_poly_init(x);
-    acb_poly_init(y);
-    acb_poly_init(res);
-    acb_poly_init(t);
-    acb_poly_init(u);
-    acb_init(a);
 
     b = acb_mat_inv(inv, star, prec);
     if (!b)
     {
         acb_mat_indeterminate(inv);
     }
-    acb_poly_set_coeff_acb(x, 0, acb_mat_entry(inv, 1, 0));
-    acb_poly_set_coeff_acb(x, 1, acb_mat_entry(inv, 0, 0));
-    acb_poly_set_coeff_acb(y, 0, acb_mat_entry(inv, 1, 1));
-    acb_poly_set_coeff_acb(y, 1, acb_mat_entry(inv, 0, 1));
-
-    if (acb_poly_degree(val) > j)
-    {
-        flint_printf("(hecke_slash) Error: degree too high\n");
-        flint_abort();
-    }
-    for (i = 0; i <= j; i++)
-    {
-        acb_poly_get_coeff_acb(a, val, i);
-        acb_poly_pow_ui(t, x, i, prec);
-        acb_poly_pow_ui(u, y, j - i, prec);
-        acb_poly_mul(t, t, u, prec);
-        acb_poly_scalar_mul(t, t, a, prec);
-        acb_poly_add(res, res, t, prec);
-    }
-
-    acb_mat_det(a, inv, prec);
-    acb_pow_ui(a, a, k, prec);
-    acb_poly_scalar_mul(im, res, a, prec);
-
-    acb_mat_clear(inv);
-    acb_poly_clear(x);
-    acb_poly_clear(y);
-    acb_poly_clear(res);
-    acb_poly_clear(t);
-    acb_poly_clear(u);
-    acb_clear(a);
+    acb_theta_g2_detk_symj(im, inv, val, k, j, prec);
 }
 
 static int
