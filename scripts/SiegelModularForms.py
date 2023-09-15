@@ -40,7 +40,7 @@ class SMF(SageObject):
     def __init__(self, k, j):
         self.k = k
         self.j = j
-        self.prec = 0
+        self.prec = 3
         self.dim = None
         self.basis = None
         self.decomposition = None
@@ -207,13 +207,13 @@ class SMF(SageObject):
                 f.write(run.stdout.decode("ASCII"))
 
         d = self.Dimension()
-        M = Matrix(ZZ, d, d)
+        M = Matrix(QQ, d, d)
         with open(filename + ".out", "r") as f:
             for k in range(d):
                 line = f.readline().strip("[]\n").split(" ")
                 assert len(line) == d, "Line is not of expected length {}".format(d)
                 for j in range(d):
-                    M[k,j] = ZZ(line[j])
+                    M[k,j] = QQ(line[j])
         subprocess.run(["rm", filename + ".out"])
         return M
 
