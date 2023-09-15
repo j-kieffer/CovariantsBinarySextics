@@ -265,8 +265,8 @@ def change_r_to_q_cov(cov):
     return res
 
 def get_chi6m2(prec):
-    chi5 = get_chi5(prec)
-    chi63 = get_chi63(prec)
+    chi5 = get_chi5(4*prec)
+    chi63 = get_chi63(4*prec)
     r1, r2 = chi5.parent().gens()
     r12 = chi5.base_ring().gen()
     lc = (r12**2 - r12**(-2))*r1**4*r2**4
@@ -285,7 +285,10 @@ def get_chi6m2(prec):
         for k in coeff_dict.keys():
             chi6m2_coeff += (coeff_dict[k] / lc_mon ) * r1**(k[0]-lc_exp[0]) * r2**(k[1]-lc_exp[1])
         chi6m2 += chi6m2_coeff * x**(exp[0]) * y**(exp[1])
-    return change_r_to_q_cov(chi6m2)
+    chi = change_r_to_q_cov(chi6m2)
+    q = chi.parent().base().gens()
+    chi = sum([(chi.monomial_coefficient(m) + O(q[0]**prec))*m for m in chi.monomials()])
+    return chi
 
 def rat_func_sub(f, u):
     num = f.numerator().subs(u)

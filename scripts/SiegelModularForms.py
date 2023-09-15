@@ -84,33 +84,37 @@ class SMF(SageObject):
         b_comps_exp = [b.subs(g_sub_dict) for b in basis]
         return b_comps_exp, b_exps
 
-    def _solve_linear_system(V, b_comps_exp, b_exps):
+    def _solve_linear_system(V, b_comps_exp, b_exps, up_to_val=0):
         ker = V
         qexps = reduce(lambda x,y: x.union(y),
                        [reduce(lambda x,y: x.union(y),
                                [Set(list(b_c.coeffs.keys()))
                                 for b_c in b_c_e.coeffs.values()])
                         for b_c_e in b_comps_exp])
+        Rs = reduce(lambda x,y: x + y,
+                    [reduce(lambda x,y : x + y,
+                            [list(b_c.coeffs.values()) for b_c in b_c_e.coeffs.values()])
+                     for b_c_e in b_comps_exp])[0].parent()
         for qexp in qexps:
             for i in range(len(b_exps)):
                 all_vals = []
                 all_coeffs = []
-                for j, b_c_e in enumerate(b_comps_exp):
+                for b_c_e in b_comps_exp:
                     b_c = b_c_e.coeffs[b_exps[i]]
-                    mon = b_c.coeffs.get(qexp, FJexp(0))
+                    mon = b_c.coeffs.get(qexp, Rs(0))
                     v = mon.valuation()
                     coeffs = list(mon)
                     all_vals.append(v)
-                    if (v >= 0):
+                    if (v >= up_to_val):
                         all_coeffs.append([])
                     else:
                         all_coeffs.append(coeffs[:-v])
                 min_val = min(all_vals)
-                if (min_val < 0):
-                    max_len = max([len(all_coeffs[j]) + all_vals[j] for j in range(len(all_vals)) if all_vals[j] < 0])
+                if (min_val < up_to_val):
+                    max_len = max([len(all_coeffs[j]) + all_vals[j] for j in range(len(all_vals)) if all_vals[j] < up_to_val])
                     for j in range(len(all_vals)):
                         v = all_vals[j]
-                        if (v >= 0):
+                        if (v >= up_to_val):
                             v = max_len
                         all_coeffs[j] = [0 for l in range(v-min_val)] + all_coeffs[j]
                 max_len = max([len(a) for a in all_coeffs])
@@ -144,11 +148,11 @@ class SMF(SageObject):
             self.prec += 1
             if (SMF.prec < self.prec):
                 print("Recomputing expansion of chi_6_m_2 to precision {}...".format(self.prec))
-                SMF.chi = get_chi6m2(4*self.prec)
+                SMF.chi = get_chi6m2(self.prec)
                 SMF.prec = self.prec
                 # !! TODO - this should be inside get_chi6m2
-                q = SMF.chi.parent().base().gens()
-                SMF.chi = sum([(SMF.chi.monomial_coefficient(m) + O(q[0]**prec))*m for m in SMF.chi.monomials()])
+                # q = SMF.chi.parent().base().gens()
+                # SMF.chi = sum([(SMF.chi.monomial_coefficient(m) + O(q[0]**prec))*m for m in SMF.chi.monomials()])
                 print("Done!")
 
             ker_dim = infinity

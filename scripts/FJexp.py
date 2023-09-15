@@ -142,6 +142,10 @@ class FJexp(SageObject):
             return ret
 
     def __radd__(self, r):
+        if (self.coeffs == {}):
+            ret = FJexp(r)
+            ret.prec = self.prec
+            return ret
         ret = FJexp(self)
         R = list(self.coeffs.values())[0].parent()
         ret.coeffs[ETuple([0,0])] = ret.coeffs.get(ETuple([0,0]), R(0)) + r
