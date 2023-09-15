@@ -1,5 +1,6 @@
 import sage
 from sage.all import GF, ZZ, QQ, prod, PolynomialRing, exp
+from pathlib import Path
 from sage.all import FunctionField
 from sage.rings.polynomial.laurent_polynomial_ring import LaurentPolynomialRing
 from sage.rings.power_series_ring import PowerSeriesRing
@@ -269,8 +270,26 @@ class Chi(SageObject):
     def __init__(self,k,j):
         # at the moment we only support Chi_6_minus_2
         assert (k == 6) and (j == -2)
+        self.FJexp = None
+        self.prec = 0
+        self.fname = "chi6m2_fjexp.dat"
+        file_exists = Path(self.fname).is_file()
+        if (file_exists):
+            self.ReadFJexpFromFile(self.fname)
 
-    def GetFJexp(self, prec):
+    def GetFJexp(self, prec=0):
+        if (self.FJexp is None) or (prec > self.prec):
+            prec = max(prec, 2)
+            self.FJexp = self._ComputeFJexp(prec)
+            self.prec = prec
+            self.WriteFJexpToFile(self.fname)
+        # truncating to match required precision
+        chi = self.FJexp
+        q = chi.parent().base().gens()
+        chi = sum([(chi.monomial_coefficient(m) + O(q[0]**prec))*m for m in chi.monomials()])
+        return chi
+
+    def _ComputeFJexp(self, prec):
         assert prec >= 2
         chi5 = get_chi5(4*prec)
         chi63 = get_chi63(4*prec)
@@ -296,6 +315,30 @@ class Chi(SageObject):
         q = chi.parent().base().gens()
         chi = sum([(chi.monomial_coefficient(m) + O(q[0]**prec))*m for m in chi.monomials()])
         return chi
+
+    def WriteFJexpToFile(self, filename):
+        f = open(filename, "w")
+        chi = self.GetFJexp(self.prec)
+        chi_dict = { k :  chi.dict()[k].dict() for k in chi.dict().keys()}
+        f.write("(" + str(self.prec) + ",")
+        f.write(str(chi_dict).replace('^', '**') + ")")
+        f.close()
+
+    def SetFJexp(self, fjexp):
+        self.FJexp = fjexp
+        self.prec = fjexp.prec
+
+    def ReadFJexpFromFile(self, filename):
+        f = open(filename)
+        Ru = FunctionField(QQ, "u")
+        u = Ru.gen()
+        Ruq = PowerSeriesRing(Ru, ["q1", "q2"])
+        q1, q2 = Ruq.gens()
+        Ruqxy = PolynomialRing(Ruq, ["x", "y"])
+        x,y = Ruqxy.gens()
+        self.prec, chi_dict = eval(f.read())
+        self.FJexp = Ruqxy(chi_dict) + O(q1**self.prec)
+        f.close()
 
 def rat_func_sub(f, u):
     num = f.numerator().subs(u)
