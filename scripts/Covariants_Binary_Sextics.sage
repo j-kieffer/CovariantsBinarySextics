@@ -74,6 +74,19 @@ C94.form().numerator(),
 C102.form().numerator(),
 C122.form().numerator()]
 
+LCovNotNorm = [C20.form(),C40.form(),C60.form(),C100.form(),C150.form(),
+C16.form(),
+C24.form(),C28.form(),
+C32.form(),C36.form(),C38.form(),C312.form(),
+C44.form(),C46.form(),C410.form(),
+C52.form(),C54.form(),C58.form(),
+C661.form(),C662.form(),
+C72.form(),C74.form(),
+C82.form(),
+C94.form(),
+C102.form(),
+C122.form()] 
+
 Co.<Co20,Co40,Co60,Co100,Co150,Co16,Co24,C28,Co32,Co36,Co38,Co312,Co44,Co46,Co410,Co52,Co54,Co58,Co661,Co662,Co72,Co74,Co82,Co94,Co102,Co122> = PolynomialRing(QQ)
 
 LCo = [Co20,Co40,Co60,Co100,Co150,
