@@ -183,12 +183,17 @@ class SMF(SageObject):
         a_min = a % 10
         pole_ord = a // 10
 
-        chi10 = SMF._GetBasisWithPoles(BSC(10,0), prec, taylor_prec, -1, 1)
+        chi10 = SMF._GetBasisWithPoles(BSC(10,0), prec, taylor_prec, -1, 1)[0][0]
 
+        if (j == 0):
+            a_min = a
+            pole_ord = 0
+            
         bsc = BSC(a_min, j)
-        self.basis, self.prec, self.s_prec = SMF._GetBasisWithPoles(BSC(10,0), prec, taylor_prec, pole_ord, self.Dimension())
+        dim = self.Dimension() # - (1 if j == 0 else 0)
+        self.basis, self.prec, self.s_prec = SMF._GetBasisWithPoles(bsc, prec, taylor_prec, pole_ord, dim)
 
-        self.basis = [(chi10)^pole_ord * b for b in self.basis]
+        self.basis = [(chi10)**pole_ord * b for b in self.basis]
         
         return self.basis
 
