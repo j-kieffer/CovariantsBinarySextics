@@ -134,9 +134,14 @@ class SMF(SageObject):
 
         k = self.k
         j = self.j
+
+        a = k + j//2
+        a_min = a % 10
+        pole_ord = a // 10
         
         print("Creating basis of covariants...")
-        bsc = BSC(k+j//2,j)
+        # bsc = BSC(k+j//2,j)
+        bsc = BSC(a_min, j)
         basis = bsc.GetBasis()
         print("Done!")
         if (len(basis) == 0):
@@ -172,7 +177,7 @@ class SMF(SageObject):
 
                 #Linear algebra
                 print("Solving linear system...")
-                ker = SMF._solve_linear_system(V, b_comps_exp, b_exps)
+                ker = SMF._solve_linear_system(V, b_comps_exp, b_exps, up_to_val=-2*pole_ord)
                 print("Done!")
         
         # Take only highest valuations
