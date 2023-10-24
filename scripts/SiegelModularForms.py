@@ -179,21 +179,22 @@ class SMF(SageObject):
         k = self.k
         j = self.j
 
-        a = k + j//2
-        a_min = a % 10
-        pole_ord = a // 10
+        a_max = k + j//2
+        a_min = a_max % 10
+        pole_ord = a_max // 10
 
         chi10 = SMF._GetBasisWithPoles(BSC(10,0), prec, taylor_prec, -1, 1)[0][0]
 
-        if (j == 0):
-            a_min = a
-            pole_ord = 0
-            
-        bsc = BSC(a_min, j)
-        dim = self.Dimension() # - (1 if j == 0 else 0)
-        self.basis, self.prec, self.s_prec = SMF._GetBasisWithPoles(bsc, prec, taylor_prec, pole_ord, dim)
-
-        self.basis = [(chi10)**pole_ord * b for b in self.basis]
+        self.basis = []
+        dim = self.Dimension()
+        
+        a = a_min
+        while (len(self.basis) < dim):
+            bsc = BSC(a, j)
+            self.basis, self.prec, self.s_prec = SMF._GetBasisWithPoles(bsc, prec, taylor_prec, pole_ord, dim)
+            self.basis = [(chi10)**pole_ord * b for b in self.basis]
+            a += 10
+            pole_ord -= 1
         
         return self.basis
 

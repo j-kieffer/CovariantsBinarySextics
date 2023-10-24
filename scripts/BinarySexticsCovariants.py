@@ -114,6 +114,8 @@ class BinarySexticsCovariants(SageObject):
             R = PolynomialRing(ZZ, ['p'])
             p = R.gen()
             n = 3*a-b//2
+            if (n < 0):
+                return 0
             f = (1-p)*q_binomial(6+a,a,p)
             d = f.list()[n]
             return d
@@ -131,6 +133,8 @@ class BinarySexticsCovariants(SageObject):
         exps = reduce(lambda x,y: x.union(y), [Set(lc.exponents()) for lc in lcs], Set([]))
         # We try to make this more efficient as exps is very long
         dim = self.Dimension()
+        if (dim == 0):
+            return [], [], []
         rk = 0
         maybe_enough_coeffs = 0
         coeff_data = []
