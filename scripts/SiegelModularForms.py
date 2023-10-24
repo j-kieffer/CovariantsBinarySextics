@@ -127,48 +127,36 @@ class SMF(SageObject):
                 ker_mat = mat_coeffs.kernel()
                 ker = ker.intersection(ker_mat)
         return ker
-    
-    def GetBasis(self, prec=3, taylor_prec=20):
-        if (not self.basis is None and prec <= self.prec):
-            return self.basis
 
-        k = self.k
-        j = self.j
-
-        a = k + j//2
-        a_min = a % 10
-        pole_ord = a // 10
-        
+    def _GetBasisWithPoles(bsc, prec, taylor_prec, pole_ord, dim):
         print("Creating basis of covariants...")
-        # bsc = BSC(k+j//2,j)
-        bsc = BSC(a_min, j)
         basis = bsc.GetBasis()
         print("Done!")
         if (len(basis) == 0):
-            self.basis = []
-            return self.basis
+            basis = []
+            return basis, prec, taylor_prec
 
         V = VectorSpace(QQ, len(basis))
         ker = V
-        self.prec = prec-1
-        self.s_prec = taylor_prec-10
-        print ("Trying to get to dimension ", self.Dimension())
-        while (ker.dimension() > self.Dimension()):
-            self.prec += 1
-            if (SMF.prec < self.prec):
-                print("Recomputing expansion of chi_6_m_2 to precision {}...".format(self.prec))
-                SMF.chi = Chi(6,-2).GetFJexp(self.prec)
-                SMF.prec = self.prec
+        prec = prec-1
+        s_prec = taylor_prec-10
+        print ("Trying to get to dimension ", dim)
+        while (ker.dimension() > dim):
+            prec += 1
+            if (SMF.prec < prec):
+                print("Recomputing expansion of chi_6_m_2 to precision {}...".format(prec))
+                SMF.chi = Chi(6,-2).GetFJexp(prec)
+                SMF.prec = prec
                 print("Done!")
 
             ker_dim = infinity
-            while ((ker.dimension() > self.Dimension()) and (ker.dimension() < ker_dim)):
+            while ((ker.dimension() > dim) and (ker.dimension() < ker_dim)):
                 print("Dimension obtained is ", ker.dimension())
-                print("increasing precision in s to {}...".format(self.s_prec))
+                print("increasing precision in s to {}...".format(s_prec))
                 ker_dim = ker.dimension()
-                self.s_prec += 10
+                s_prec += 10
                 # Compute Taylor expansion: this is cheap.
-                t_chi = VectorFJexp(SMF.chi, self.s_prec)
+                t_chi = VectorFJexp(SMF.chi, s_prec)
 
                 # Substitution
                 print("Substituting chi_6_m_2...")
@@ -181,7 +169,27 @@ class SMF(SageObject):
                 print("Done!")
         
         # Take only highest valuations
-        self.basis = [sum([b.denominator()*b[i]*basis[i] for i in range(len(basis))]) for b in ker.basis()]
+        basis = [sum([b.denominator()*b[i]*basis[i] for i in range(len(basis))]) for b in ker.basis()]
+        return basis, prec, s_prec
+    
+    def GetBasis(self, prec=3, taylor_prec=20):
+        if (not self.basis is None and prec <= self.prec):
+            return self.basis
+
+        k = self.k
+        j = self.j
+
+        a = k + j//2
+        a_min = a % 10
+        pole_ord = a // 10
+
+        chi10 = SMF._GetBasisWithPoles(BSC(10,0), prec, taylor_prec, -1, 1)
+
+        bsc = BSC(a_min, j)
+        self.basis, self.prec, self.s_prec = SMF._GetBasisWithPoles(BSC(10,0), prec, taylor_prec, pole_ord, self.Dimension())
+
+        self.basis = [(chi10)^pole_ord * b for b in self.basis]
+        
         return self.basis
 
     def WriteBasisToFile(self, filename):
