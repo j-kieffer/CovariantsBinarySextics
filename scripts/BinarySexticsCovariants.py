@@ -96,8 +96,8 @@ class BinarySexticsCovariants(SageObject):
             all_ws += [[w0] + w for w in ws]
         return all_ws
 
-    def Dimension(self):
-        # using he Cayley-Sylvester formula
+    def Dimension2(self):
+        # using the Cayley-Sylvester formula
         a = self.a
         b = self.b
         n = 3 * a - b // 2
@@ -105,7 +105,7 @@ class BinarySexticsCovariants(SageObject):
             return Partitions(n,max_length=k, max_part=6).cardinality()
         return p(a,n) - p(a,n-1)
         
-    def Dimension2(self):
+    def Dimension(self):
         a = self.a
         b = self.b
         if ((b % 2) == 1):
@@ -156,19 +156,23 @@ class BinarySexticsCovariants(SageObject):
         lcs = [coeff_ring(c[1].coefficient([0,self.b])) for c in covs]
         exps = reduce(lambda x,y: x.union(y), [Set(lc.exponents()) for lc in lcs], Set([]))
         # We try to make this more efficient as exps is very long
-        maybe_enough_coeffs = 2*len(lcs)
-        coeffs_mat = Matrix([[ZZ(lc.coefficient(e)) for e in exps[:maybe_enough_coeffs]] for lc in lcs])
-        maybe_rels = coeffs_mat.kernel().basis()
-        check_rels = [sum([rel[i]*covs[i][1] for i in range(len(covs))]) for rel in maybe_rels]
-        rels = [maybe_rels[i] for i in range(len(maybe_rels)) if check_rels[i] == 0]
+        dim = self.Dimension()
+        rk = 0
+        maybe_enough_coeffs = 0
+        coeff_data = []
+        while (rk != dim):
+            more_coeffs = len(lcs)
+            coeff_data += [[QQ(lc.coefficient(e)) for lc in lcs] for e in exps[maybe_enough_coeffs:maybe_enough_coeffs+more_coeffs]]
+            maybe_enough_coeffs += more_coeffs
+            # coeffs_mat = Matrix([[ZZ(lc.coefficient(e)) for e in exps[:maybe_enough_coeffs]] for lc in lcs])
+            # coeffs_mat = Matrix([[QQ(lc.coefficient(e)) for e in exps[:maybe_enough_coeffs]] for lc in lcs])
+            coeffs_mat = Matrix(coeff_data).transpose()
+            rk = coeffs_mat.rank()
+        rels = coeffs_mat.kernel().basis()
+        rels = [rel.denominator() * rel for rel in rels]
         rels_symb = [sum([rel[i]*covs[i][0] for i in range(len(covs))]) for rel in rels]
-        ## Fixing C_basis
-        add_exps = reduce(lambda x,y: x.union(y), [Set(coeff_ring(check_rels[i].coefficient([0,self.b])).exponents()) for
-                                                   i in range(len(maybe_rels)) if check_rels[i] != 0], Set([]))
-        all_exps = exps[:maybe_enough_coeffs] + add_exps[:len(add_exps)]
-        coeffs_mat = Matrix([[ZZ(lc.coefficient(e)) for e in all_exps] for lc in lcs])
         C_basis = [covs[i][0] for i in coeffs_mat.pivot_rows()]
-        assert len(C_basis) == self.Dimension()
+        assert len(C_basis) == dim
         return C_basis, rels_symb
 
 
