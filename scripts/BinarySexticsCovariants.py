@@ -117,7 +117,34 @@ class BinarySexticsCovariants(SageObject):
             f = (1-p)*q_binomial(6+a,a,p)
             d = f.list()[n]
             return d
-        
+
+    def _ComputeBasisAndRelationsCov(self):
+        r"""
+        Computes the basis and relations for both of the following functions
+        """
+        W = BinarySexticsCovariants.GetGeneratorsCov(BinarySexticsCovariants.LW, self.weight)
+        covs = [BinarySexticsCovariants.MakeCov(wt) for wt in W]
+        poly_ring_bivariate = BinarySexticsCovariants.LCov[0].parent()
+        coeff_ring = poly_ring_bivariate.base_ring()
+        # Here we are using the theorem by Roberts, stating it is enough to consider the coefficient of x^b
+        lcs = [coeff_ring(c[1].coefficient([0,self.b])) for c in covs]
+        exps = reduce(lambda x,y: x.union(y), [Set(lc.exponents()) for lc in lcs], Set([]))
+        # We try to make this more efficient as exps is very long
+        dim = self.Dimension()
+        rk = 0
+        maybe_enough_coeffs = 0
+        coeff_data = []
+        while (rk != dim):
+            more_coeffs = len(lcs)
+            coeff_data += [[QQ(lc.coefficient(e)) for lc in lcs] for e in exps[maybe_enough_coeffs:maybe_enough_coeffs+more_coeffs]]
+            maybe_enough_coeffs += more_coeffs
+            coeffs_mat = Matrix(coeff_data).transpose()
+            rk = coeffs_mat.rank()
+        rels = coeffs_mat.kernel().basis()
+        rels = [rel.denominator() * rel for rel in rels]
+        C_basis = [covs[i][0] for i in coeffs_mat.pivot_rows()]
+        assert len(C_basis) == dim
+        return C_basis, rels, covs
     
     def GetBasisAndRelationsCov(self):
         r"""
@@ -148,33 +175,9 @@ class BinarySexticsCovariants(SageObject):
             [1953125*Co20^9*Co40^3 - 15000000*Co20^7*Co40^4 - 1171875*Co20^8*Co40^2*Co60 + 43200000*Co20^5*Co40^5 + 4125000*Co20^6*Co40^3*Co60 + 234375*Co20^7*Co40*Co60^2 - 55296000*Co20^3*Co40^6 + 2160000*Co20^4*Co40^4*Co60 + 900000*Co20^5*Co40^2*Co60^2 - 15625*Co20^6*Co60^3 + 1687500*Co20^6*Co40^2*Co100 + 26542080*Co20*Co40^7 - 20736000*Co20^2*Co40^5*Co60 - 6048000*Co20^3*Co40^3*Co60^2 - 375000*Co20^4*Co40*Co60^3 - 9720000*Co20^4*Co40^3*Co100 - 675000*Co20^5*Co40*Co60*Co100 + 18579456*Co40^6*Co60 + 6635520*Co20*Co40^4*Co60^2 + 806400*Co20^2*Co40^2*Co60^3 + 30000*Co20^3*Co60^4 + 18662400*Co20^2*Co40^4*Co100 + 2592000*Co20^3*Co40^2*Co60*Co100 + 67500*Co20^4*Co60^2*Co100 - 55296*Co40^3*Co60^3 - 11520*Co20*Co40*Co60^4 - 11943936*Co40^5*Co100 - 2488320*Co20*Co40^3*Co60*Co100 + 486000*Co20^3*Co40*Co100^2 + 1152*Co60^5 - 248832*Co40^2*Co60^2*Co100 - 25920*Co20*Co60^3*Co100 - 933120*Co20*Co40^2*Co100^2 - 97200*Co20^2*Co60*Co100^2 + 93312*Co40*Co60*Co100^2 + 46656*Co100^3 + 14929920000000000*Co150^2]
         
         """
-        W = BinarySexticsCovariants.GetGeneratorsCov(BinarySexticsCovariants.LW, self.weight)
-        covs = [BinarySexticsCovariants.MakeCov(wt) for wt in W]
-        poly_ring_bivariate = BinarySexticsCovariants.LCov[0].parent()
-        coeff_ring = poly_ring_bivariate.base_ring()
-        # Here we are using the theorem by Roberts, stating it is enough to consider the coefficient of x^b
-        lcs = [coeff_ring(c[1].coefficient([0,self.b])) for c in covs]
-        exps = reduce(lambda x,y: x.union(y), [Set(lc.exponents()) for lc in lcs], Set([]))
-        # We try to make this more efficient as exps is very long
-        dim = self.Dimension()
-        rk = 0
-        maybe_enough_coeffs = 0
-        coeff_data = []
-        while (rk != dim):
-            more_coeffs = len(lcs)
-            coeff_data += [[QQ(lc.coefficient(e)) for lc in lcs] for e in exps[maybe_enough_coeffs:maybe_enough_coeffs+more_coeffs]]
-            maybe_enough_coeffs += more_coeffs
-            # coeffs_mat = Matrix([[ZZ(lc.coefficient(e)) for e in exps[:maybe_enough_coeffs]] for lc in lcs])
-            # coeffs_mat = Matrix([[QQ(lc.coefficient(e)) for e in exps[:maybe_enough_coeffs]] for lc in lcs])
-            coeffs_mat = Matrix(coeff_data).transpose()
-            rk = coeffs_mat.rank()
-        rels = coeffs_mat.kernel().basis()
-        rels = [rel.denominator() * rel for rel in rels]
+        C_basis, rels, covs = self._ComputeBasisAndRelationsCov()
         rels_symb = [sum([rel[i]*covs[i][0] for i in range(len(covs))]) for rel in rels]
-        C_basis = [covs[i][0] for i in coeffs_mat.pivot_rows()]
-        assert len(C_basis) == dim
         return C_basis, rels_symb
-
 
     def GetBasis(self):
         r"""
@@ -197,25 +200,5 @@ class BinarySexticsCovariants(SageObject):
             [Co32*Co36, Co28*Co40, Co24*Co44, Co20*Co24^2, Co20^2*Co28, Co16*Co20*Co32]
 
         """
-        W = BinarySexticsCovariants.GetGeneratorsCov(BinarySexticsCovariants.LW, self.weight)
-        covs = [BinarySexticsCovariants.MakeCov(wt) for wt in W]
-        poly_ring_bivariate = BinarySexticsCovariants.LCov[0].parent()
-        coeff_ring = poly_ring_bivariate.base_ring()
-        # Here we are using the theorem by Roberts, stating it is enough to consider the coefficient of x^b
-        lcs = [coeff_ring(c[1].coefficient([0,self.b])) for c in covs]
-        exps = reduce(lambda x,y: x.union(y), [Set(lc.exponents()) for lc in lcs], Set([]))
-        # We try to make this more efficient as exps is very long
-        maybe_enough_coeffs = len(lcs)+2
-        coeffs_mat = Matrix([[ZZ(lc.coefficient(e)) for e in exps[:maybe_enough_coeffs]] for lc in lcs])
-        maybe_rels = coeffs_mat.kernel().basis()
-        check_rels = [sum([rel[i]*covs[i][1] for i in range(len(covs))]) for rel in maybe_rels]
-        rels = [maybe_rels[i] for i in range(len(maybe_rels)) if check_rels[i] == 0]
-        ## Fixing C_basis
-        add_exps = reduce(lambda x,y: x.union(y), [Set(coeff_ring(check_rels[i].coefficient([0,self.b])).exponents()) for
-                                                   i in range(len(maybe_rels)) if check_rels[i] != 0], Set([]))
-        all_exps = exps[:maybe_enough_coeffs] + add_exps[:len(add_exps)]
-        # coeffs_mat = Matrix([[ZZ(lc.coefficient(e)) for e in all_exps] for lc in lcs])
-        coeffs_mat = Matrix([[QQ(lc.coefficient(e)) for e in all_exps] for lc in lcs])
-        C_basis = [covs[i][0] for i in coeffs_mat.pivot_rows()]
-        # assert len(C_basis) == self.Dimension()
+        C_basis, rels, covs = self._ComputeBasisAndRelationsCov()
         return C_basis
