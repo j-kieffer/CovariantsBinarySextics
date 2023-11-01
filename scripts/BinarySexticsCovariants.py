@@ -40,6 +40,12 @@ class BinarySexticsCovariants(SageObject):
         self.b = b
         self.weight = (a,b)
 
+    def __str__(self):
+        return "Space of covariants of binary sextics of degree " + str(self.a) + " and order " + str(self.b)
+
+    def __repr__(self):
+        return str(self)
+
     def GetCov(cov_name):
         idx = BinarySexticsCovariants.LCo[0].parent().variable_names().index(cov_name)
         return BinarySexticsCovariants.LCov[idx]

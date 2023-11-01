@@ -50,6 +50,12 @@ class SMF(SageObject):
         #    if not B is None:
         #        self.SetBasis(B)
 
+    def __str__(self):
+        return "Space of Siegel modular form of weight ("+str(self.k)+"," + str(self.j) + ")"
+
+    def __repr__(self):
+        return str(self)
+    
     def SetBasis(self, L):
         CRing = RingOfCovariants()
         self.basis = [CRing(x) for x in L]
@@ -62,15 +68,15 @@ class SMF(SageObject):
                 self.dim = dim_splitting_VV_All_weight(self.k, self.j)['total_dim']
         return self.dim
 
-    def _subs_chi(bsc, basis, chi, t_chi):
-        basis_expanded = [b.subs(bsc.DCov) for b in basis]
+    def _subs_chi(basis, chi, t_chi):
+        basis_expanded = [b.subs(BSC.DCov) for b in basis]
         exps = list(chi.dict().keys())
         t_chi_vals = list(t_chi.coeffs.values())
         R = t_chi_vals[0].parent()
         t_chi_comps = [t_chi.coeffs.get(exp, R(0)) for exp in exps]
         assert len(t_chi_comps) == 7
         gens = list(reduce(lambda x,y:x.union(y), [Set(b.variables()) for b in basis]))
-        gens_exp = [g.subs(bsc.DCov) for g in gens]
+        gens_exp = [g.subs(BSC.DCov) for g in gens]
         g_exps = [list(g_exp.dict().keys()) for g_exp in gens_exp]
         b_exps = list(basis_expanded[0].dict().keys())
         vals = list(basis_expanded[0].dict().values())
@@ -140,8 +146,11 @@ class SMF(SageObject):
         ker = V
         prec = prec-1
         s_prec = taylor_prec-10
-        print ("Trying to get to dimension ", dim)
-        while (ker.dimension() > dim):
+        print("Attempting to find a basis for covariants in "+str(bsc)+" with pole of order at most "+str(pole_ord))
+        print("Trying to get to dimension ", dim)
+        is_first_outer = True
+        while ((is_first_outer) or (ker.dimension() > dim)):
+            is_first_outer = False
             prec += 1
             if (SMF.prec < prec):
                 print("Recomputing expansion of chi_6_m_2 to precision {}...".format(prec))
@@ -150,17 +159,20 @@ class SMF(SageObject):
                 print("Done!")
 
             ker_dim = infinity
-            while ((ker.dimension() > dim) and (ker.dimension() < ker_dim)):
+            is_first = True
+            while ((is_first) or
+                   ((ker.dimension() > dim) and (ker.dimension() < ker_dim))):
                 print("Dimension obtained is ", ker.dimension())
-                print("increasing precision in s to {}...".format(s_prec))
+                is_first = False
                 ker_dim = ker.dimension()
                 s_prec += 10
                 # Compute Taylor expansion: this is cheap.
+                print("increasing precision in s to {}...".format(s_prec))
                 t_chi = VectorFJexp(SMF.chi, s_prec)
 
                 # Substitution
                 print("Substituting chi_6_m_2...")
-                b_comps_exp, b_exps = SMF._subs_chi(bsc, basis, SMF.chi, t_chi)
+                b_comps_exp, b_exps = SMF._subs_chi(basis, SMF.chi, t_chi)
                 print("Done!")
 
                 #Linear algebra
