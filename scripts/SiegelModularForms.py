@@ -210,8 +210,10 @@ class SMF(SageObject):
         
         return self.basis
 
-    def WriteBasisToFile(self, filename):
-        with open(filename, "w") as f:
+    def WriteBasisToFile(self, filename, mode):
+        with open(filename, mode) as f:
+            if mode == "a":
+                f.write("\n\n")
             B = self.GetBasis()
             d = self.Dimension()
             for k in range(d):
@@ -219,8 +221,10 @@ class SMF(SageObject):
                 if k < d - 1:
                     f.write("\n")
 
-    def WriteDecompositionToFile(self, filename):
-        with open(filename, "w") as f:
+    def WriteDecompositionToFile(self, filename, mode):
+        with open(filename, mode) as f:
+            if mode == "a":
+                f.write("\n\n")
             D = self.HeckeDecomposition()
             d = len(D)
             for k in range(d):
@@ -233,8 +237,8 @@ class SMF(SageObject):
                     f.write("\n\n")
 
     # This computes the Hecke action on full basis up to some cofactor
-    def HeckeAction(self, q, filename="hecke", log=True):
-        self.WriteBasisToFile(filename + ".in")
+    def HeckeAction(self, q, filename="../data/temp", log=True):
+        self.WriteBasisToFile(filename + ".in", "w")
         call = ["./hecke.exe", "{}".format(q), filename + ".in", filename + ".out"]
         run = subprocess.run(call, capture_output=True, check=True)
         subprocess.run(["rm", filename + ".in"])
@@ -298,8 +302,8 @@ class SMF(SageObject):
             self.HeckeDecomposition()
         return self.fields
 
-    def HeckeActionOnEigenvectors(self, q, filename="hecke", log=True):
-        self.WriteDecompositionToFile(filename + ".in")
+    def HeckeActionOnEigenvectors(self, q, filename="../data/temp", log=True):
+        self.WriteDecompositionToFile(filename + ".in", "w")
         call = ["./hecke.exe", "{}".format(q), filename + ".in", filename + ".out"]
         run = subprocess.run(call, capture_output=True, check=True)
         subprocess.run(["rm", filename + ".in"])
@@ -348,3 +352,13 @@ def SMFPrecomputedScalarBasis(k):
         return bases[k]
     else:
         return None
+
+def WriteAllSpaces(jbound = 20, kbound = 20, filename = "../data/all.in"):
+    mode = "w"
+    for j in range(2, jbound + 1, 2):
+        for k in range(kbound + 1):
+            print("\nDoing (k,j) = ({},{})".format(k, j))
+            S = SMF(k, j)
+            if S.Dimension() > 0:
+                S.WriteDecompositionToFile(filename, mode);
+                mode = "a"

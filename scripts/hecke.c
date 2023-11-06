@@ -703,14 +703,14 @@ hecke_attempt(fmpq_mat_struct* mats, const fmpz_mpoly_struct** pols,
     flint_printf("\n(hecke_attempt) attempt at precision %wd\n", prec);
     hecke_generate_base_points(tau, max_dim, prec);
 
-    flint_printf("(hecke_attempt) evaluating covariants at base points...");
+    flint_printf("(hecke_attempt) evaluating covariants at base points...\n");
     hecke_source(source, pols, nb_spaces, dims, tau, max_dim, ctx, prec);
     for (k = 0; (k < nb_spaces) && res; k++)
     {
         res = acb_mat_inv(&source[k], &source[k], prec);
     }
 
-    flint_printf("(hecke_attempt) evaluating Hecke action...");
+    flint_printf("(hecke_attempt) evaluating Hecke action...\n");
     for (k = 0; (k < nb) && res; k++)
     {
         hecke_add_term(hecke, pols, nb_spaces, dims, tau, max_dim, k, p, is_T1, ctx, prec);
@@ -744,6 +744,11 @@ hecke_attempt(fmpq_mat_struct* mats, const fmpz_mpoly_struct** pols,
                 res = acb_get_approx_fmpq(fmpq_mat_entry(&mats[k], j, l),
                     acb_mat_entry(&hecke[k], j, l), prec);
             }
+        }
+
+        if (res)
+        {
+            fmpq_mat_print(&mats[k]);
         }
     }
 
