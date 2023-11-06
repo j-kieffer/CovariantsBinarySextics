@@ -91,7 +91,7 @@ class SMF(SageObject):
         b_comps_exp = [b.subs(g_sub_dict) for b in basis]
         #the above line is completely broken when b = 1, so instead, do:
         for l in range(len(b_comps_exp)):
-            if b_comps_exp[l] == 1:
+            if basis[l] == 1:
                 b_comps_exp[l] = VectorFJexp(chi.parent()(1), s_prec)
         return b_comps_exp, b_exps
 
@@ -360,7 +360,7 @@ def SMFPrecomputedScalarBasis(k):
 
 def WriteAllSpaces(kbound = 20, jbound = 20, filename = "../data/all.in"):
     mode = "w"
-    for j in range(2, jbound + 1, 2):
+    for j in range(0, jbound + 1, 2):
         for k in range(kbound + 1):
             print("\nDoing (k,j) = ({},{})".format(k, j))
             S = SMF(k, j)

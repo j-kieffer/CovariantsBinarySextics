@@ -372,9 +372,14 @@ covariant_weight(slong* k, slong* j, const fmpz_mpoly_t pol, const fmpz_mpoly_ct
     slong jlist[] = COV_J;
     slong i;
 
-    fmpz_mpoly_get_term_exp_si(e, pol, 0, ctx);
     *k = 0;
     *j = 0;
+    if (fmpz_mpoly_total_degree_si(pol, ctx) == 0)
+    {
+        return;
+    }
+
+    fmpz_mpoly_get_term_exp_si(e, pol, 0, ctx);
     for (i = 0; i < ACB_THETA_G2_COV_NB; i++)
     {
         *k += e[i] * klist[i];
@@ -725,11 +730,11 @@ hecke_attempt(fmpq_mat_struct* mats, const fmpz_mpoly_struct** pols,
         acb_set_si(f, p);
         if (is_T1)
         {
-            acb_pow_ui(f, f, 4 * k0 + 2 * j0 - 6, prec);
+            acb_pow_si(f, f, 4 * k0 + 2 * j0 - 6, prec);
         }
         else
         {
-            acb_pow_ui(f, f, 2 * k0 + j0 - 3, prec);
+            acb_pow_si(f, f, 2 * k0 + j0 - 3, prec);
         }
         acb_mat_scalar_mul_acb(&hecke[k], &hecke[k], f, prec);
 
