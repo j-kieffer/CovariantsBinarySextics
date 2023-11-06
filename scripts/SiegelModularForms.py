@@ -68,8 +68,9 @@ class SMF(SageObject):
                 self.dim = dim_splitting_VV_All_weight(self.k, self.j)['total_dim']
         return self.dim
 
-    def _subs_chi(basis, chi, t_chi):
-        basis_expanded = [b.subs(BSC.DCov) for b in basis]
+    def _subs_chi(basis, chi, t_chi, s_prec):
+        RingCov = BSC.LCov[0].parent()
+        basis_expanded = [RingCov(b.subs(BSC.DCov)) for b in basis]
         exps = list(chi.dict().keys())
         t_chi_vals = list(t_chi.coeffs.values())
         R = t_chi_vals[0].parent()
@@ -88,6 +89,10 @@ class SMF(SageObject):
         g_c_e = [VectorFJexp([g_exps[l], g_comps_expanded[l]]) for l in range(len(g_exps))]
         g_sub_dict = {gens[i] : g_c_e[i] for i in range(len(gens))}
         b_comps_exp = [b.subs(g_sub_dict) for b in basis]
+        #the above line is completely broken when b = 1, so instead, do:
+        for l in range(len(b_comps_exp)):
+            if b_comps_exp[l] == 1:
+                b_comps_exp[l] = VectorFJexp(chi.parent()(1), s_prec)
         return b_comps_exp, b_exps
 
     def _create_coeff_matrix(b_comps_exp, b_exps, qexp, i, up_to_val):
@@ -171,8 +176,8 @@ class SMF(SageObject):
                 t_chi = VectorFJexp(SMF.chi, s_prec)
 
                 # Substitution
-                print("Substituting chi_6_m_2...")
-                b_comps_exp, b_exps = SMF._subs_chi(basis, SMF.chi, t_chi)
+                print("Substituting chi_6_m_2 in basis...")
+                b_comps_exp, b_exps = SMF._subs_chi(basis, SMF.chi, t_chi, s_prec)
                 print("Done!")
 
                 #Linear algebra
@@ -353,7 +358,7 @@ def SMFPrecomputedScalarBasis(k):
     else:
         return None
 
-def WriteAllSpaces(jbound = 20, kbound = 20, filename = "../data/all.in"):
+def WriteAllSpaces(kbound = 20, jbound = 20, filename = "../data/all.in"):
     mode = "w"
     for j in range(2, jbound + 1, 2):
         for k in range(kbound + 1):

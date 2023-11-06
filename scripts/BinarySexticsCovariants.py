@@ -130,8 +130,11 @@ class BinarySexticsCovariants(SageObject):
         r"""
         Computes the basis and relations for both of the following functions
         """
+        print("    Getting generators of covariants...")
         W = BinarySexticsCovariants.GetGeneratorsCov(BinarySexticsCovariants.LW, self.weight)
+        print("    Half done! MakeCov on {} vectors of exponents...".format(len(W)))
         covs = [BinarySexticsCovariants.MakeCov(wt) for wt in W]
+        print("    Done!")
         poly_ring_bivariate = BinarySexticsCovariants.LCov[0].parent()
         coeff_ring = poly_ring_bivariate.base_ring()
         # Here we are using the theorem by Roberts, stating it is enough to consider the coefficient of x^b
