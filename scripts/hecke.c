@@ -117,10 +117,10 @@ parse_covariants(fmpz_mpoly_vec_t pols, slong nb_spaces, const slong* dims,
             fmpz_mpoly_set_str_pretty(fmpz_mpoly_vec_entry(pols, pols_indices[k] + j),
                 str, (const char**) vars, ctx);
             flint_free(str);
-            flint_printf("(parse_covariants) k = %wd, j = %wd, poly:\n", k, j);
-            fmpz_mpoly_print_pretty(fmpz_mpoly_vec_entry(pols, pols_indices[k] + j),
+            /* flint_printf("(parse_covariants) k = %wd, j = %wd, poly:\n", k, j);
+               fmpz_mpoly_print_pretty(fmpz_mpoly_vec_entry(pols, pols_indices[k] + j),
                 (const char**) vars, ctx);
-            flint_printf("\n");
+                flint_printf("\n");*/
         }
 
         if (!feof(file_in))
@@ -495,7 +495,7 @@ hecke_T1_coset(fmpz_mat_t m, slong k, slong p)
     }
 }
 
-/* ---------- Evaluate multivariate polynomials ---------- */
+/* ---------- Context for multivariate polynomial evaluation ---------- */
 
 static int
 exp_le(const slong* e1, const slong* e2)
@@ -575,10 +575,29 @@ exp_is_zero(const slong* exp)
     return 1;
 }
 
+struct hecke_mpoly_ctx_struct
+{
+    slong* all_exps;
+    slong* add_chain;
+    slong nb_exps;
+
+    slong** indices;
+    fmpz** coeffs;
+    slong* nb_terms;
+    slong* max_degrees;
+    slong* ks;
+    slong* js;
+    slong lmax;
+    slong nb_pols;
+};
+
+typedef struct hecke_mpoly_ctx_struct hecke_mpoly_ctx_t[1];
+
+#define hecke_mpoly_ctx_exp(ctx, k) ((ctx)->all_exps + k * ACB_THETA_G2_COV_NB)
+
 static void
-set_add_chains(slong** all_exps, slong** add_chain, slong* nb_all,
-    slong** indices, fmpz** coeffs, slong* nb_terms, slong* max_degrees, slong* lmax,
-    const fmpz_mpoly_vec_t pols, slong nb, const fmpz_mpoly_ctx_t ctx)
+hecke_mpoly_ctx_init(hecke_mpoly_ctx_t ctx, const fmpz_mpoly_vec_t pols,
+    slong nb, const fmpz_mpoly_ctx_t mctx)
 {
     fmpz_mpoly_t sum, m;
     fmpz_t c;
@@ -586,220 +605,201 @@ set_add_chains(slong** all_exps, slong** add_chain, slong* nb_all,
     slong k, j;
     int found;
 
-    fmpz_mpoly_init(sum, ctx);
-    fmpz_mpoly_init(m, ctx);
+    ctx->indices = flint_malloc(nb * sizeof(slong*));
+    ctx->coeffs = flint_malloc(nb * sizeof(fmpz*));
+    ctx->nb_terms = flint_malloc(nb * sizeof(slong));
+    ctx->max_degrees = flint_malloc(ACB_THETA_G2_COV_NB * sizeof(slong));
+    ctx->ks = flint_malloc(nb * sizeof(slong));
+    ctx->js = flint_malloc(nb * sizeof(slong));
+    ctx->nb_pols = nb;
+
+    fmpz_mpoly_init(sum, mctx);
+    fmpz_mpoly_init(m, mctx);
     fmpz_init(c);
     exp = flint_malloc(ACB_THETA_G2_COV_NB * sizeof(slong));
 
-    /* Get nb_terms, lmax, max_degrees */
-    *lmax = 0;
+    /* Get nb_terms, lmax, max_degrees, weights */
+    ctx->lmax = 0;
     for (k = 0; k < ACB_THETA_G2_COV_NB; k++)
     {
-        max_degrees[k] = 0;
+        ctx->max_degrees[k] = 0;
     }
     for (k = 0; k < nb; k++)
     {
-        nb_terms[k] = fmpz_mpoly_length(fmpz_mpoly_vec_entry(pols, k), ctx);
-        *lmax = FLINT_MAX(*lmax, nb_terms[k]);
-        fmpz_mpoly_degrees_si(exp, fmpz_mpoly_vec_entry(pols, k), ctx);
+        ctx->nb_terms[k] = fmpz_mpoly_length(fmpz_mpoly_vec_entry(pols, k), mctx);
+        ctx->lmax = FLINT_MAX(ctx->lmax, ctx->nb_terms[k]);
+        fmpz_mpoly_degrees_si(exp, fmpz_mpoly_vec_entry(pols, k), mctx);
         for (j = 0; j < ACB_THETA_G2_COV_NB; j++)
         {
-            max_degrees[j] = FLINT_MAX(max_degrees[j], exp[j]);
+            ctx->max_degrees[j] = FLINT_MAX(ctx->max_degrees[j], exp[j]);
         }
+        covariant_weight(&(ctx->ks[k]), &(ctx->js[k]), fmpz_mpoly_vec_entry(pols, k), mctx);
     }
 
     /* Make polynomial containing all monomials + powers of one variable */
     fmpz_one(c);
     for (k = 0; k < nb; k++)
     {
-        for (j = 0; j < nb_terms[k]; j++)
+        for (j = 0; j < ctx->nb_terms[k]; j++)
         {
-            fmpz_mpoly_get_term_monomial(m, fmpz_mpoly_vec_entry(pols, k), j, ctx);
-            fmpz_mpoly_set_coeff_fmpz_monomial(sum, c, m, ctx);
+            fmpz_mpoly_get_term_monomial(m, fmpz_mpoly_vec_entry(pols, k), j, mctx);
+            fmpz_mpoly_set_coeff_fmpz_monomial(sum, c, m, mctx);
         }
     }
     for (k = 0; k < ACB_THETA_G2_COV_NB; k++)
     {
-        for (j = 1; j <= max_degrees[k]; j++)
+        for (j = 1; j <= ctx->max_degrees[k]; j++)
         {
-            fmpz_mpoly_gen(m, k, ctx);
-            fmpz_mpoly_pow_ui(m, m, j, ctx);
-            fmpz_mpoly_set_coeff_fmpz_monomial(sum, c, m, ctx);
+            fmpz_mpoly_gen(m, k, mctx);
+            fmpz_mpoly_pow_ui(m, m, j, mctx);
+            fmpz_mpoly_set_coeff_fmpz_monomial(sum, c, m, mctx);
         }
     }
 
     /* Get all exponents */
-    *nb_all = fmpz_mpoly_length(sum, ctx);
-    *all_exps = flint_malloc((*nb_all) * ACB_THETA_G2_COV_NB * sizeof(slong));
-    *add_chain = flint_malloc(2 * (*nb_all) * sizeof(slong));
-    for (j = 0; j < *nb_all; j++)
+    ctx->nb_exps = fmpz_mpoly_length(sum, mctx);
+    ctx->all_exps = flint_malloc((ctx->nb_exps) * ACB_THETA_G2_COV_NB * sizeof(slong));
+    ctx->add_chain = flint_malloc(2 * (ctx->nb_exps) * sizeof(slong));
+    for (j = 0; j < ctx->nb_exps; j++)
     {
-        fmpz_mpoly_get_term_exp_si((*all_exps) + j * ACB_THETA_G2_COV_NB, sum,
-            *nb_all - 1 - j, ctx); /* terms are in revlex order. */
+        fmpz_mpoly_get_term_exp_si(hecke_mpoly_ctx_exp(ctx, j), sum,
+            ctx->nb_exps - 1 - j, mctx); /* terms are in revlex order. */
     }
 
     /* Make addition chain with the exponents we have */
-    for (k = 0; k < *nb_all; k++)
+    for (k = 0; k < ctx->nb_exps; k++)
     {
         found = 0;
         for (j = 0; (j < k) && !found; j++)
         {
-            if (exp_is_zero((*all_exps) + j * ACB_THETA_G2_COV_NB))
+            if (exp_is_zero(hecke_mpoly_ctx_exp(ctx, j)))
             {
                 continue;
             }
 
-            if (exp_le((*all_exps) + j * ACB_THETA_G2_COV_NB,
-                    (*all_exps) + k * ACB_THETA_G2_COV_NB))
+            if (exp_le(hecke_mpoly_ctx_exp(ctx, j), hecke_mpoly_ctx_exp(ctx, k)))
             {
-                exp_sub(exp, (*all_exps) + k * ACB_THETA_G2_COV_NB,
-                    (*all_exps) + j * ACB_THETA_G2_COV_NB);
-                if (fmpz_mpoly_get_coeff_si_ui(sum, (ulong*) exp, ctx))
+                exp_sub(exp, hecke_mpoly_ctx_exp(ctx, k), hecke_mpoly_ctx_exp(ctx, j));
+
+                if (fmpz_mpoly_get_coeff_si_ui(sum, (ulong*) exp, mctx))
                 {
                     found = 1;
-                    (*add_chain)[2 * k] = j;
-                    (*add_chain)[2 * k + 1] = exp_search(*all_exps, k, exp);
+                    ctx->add_chain[2 * k] = j;
+                    ctx->add_chain[2 * k + 1] = exp_search(ctx->all_exps, k, exp);
                 }
             }
         }
 
         if (!found)
         {
-            (*add_chain)[2 * k] = -1;
-            (*add_chain)[2 * k + 1] = -1;
+            ctx->add_chain[2 * k] = -1;
+            ctx->add_chain[2 * k + 1] = -1;
         }
     }
 
-    /* Get indices, coefficients, max_degrees */
-    *lmax = 0;
-    for (k = 0; k < ACB_THETA_G2_COV_NB; k++)
-    {
-        max_degrees[k] = 0;
-    }
+    /* Get indices and coefficients */
     for (k = 0; k < nb; k++)
     {
-        coeffs[k] = _fmpz_vec_init(nb_terms[k]);
-        indices[k] = flint_malloc(2 * nb_terms[k] * sizeof(slong));
+        ctx->coeffs[k] = _fmpz_vec_init(ctx->nb_terms[k]);
+        ctx->indices[k] = flint_malloc(2 * ctx->nb_terms[k] * sizeof(slong));
 
-        for (j = 0; j < nb_terms[k]; j++)
+        for (j = 0; j < ctx->nb_terms[k]; j++)
         {
-            fmpz_mpoly_get_term_coeff_fmpz(&coeffs[k][j], fmpz_mpoly_vec_entry(pols, k), j, ctx);
-            fmpz_mpoly_get_term_exp_si(exp, fmpz_mpoly_vec_entry(pols, k), j, ctx);
-            indices[k][j] = exp_search(*all_exps, *nb_all, exp);
-        }
-
-        *lmax = FLINT_MAX(*lmax, nb_terms[k]);
-        fmpz_mpoly_degrees_si(exp, fmpz_mpoly_vec_entry(pols, k), ctx);
-        for (j = 0; j < ACB_THETA_G2_COV_NB; j++)
-        {
-            max_degrees[j] = FLINT_MAX(max_degrees[j], exp[j]);
+            fmpz_mpoly_get_term_coeff_fmpz(&ctx->coeffs[k][j],
+                fmpz_mpoly_vec_entry(pols, k), j, mctx);
+            fmpz_mpoly_get_term_exp_si(exp, fmpz_mpoly_vec_entry(pols, k), j, mctx);
+            ctx->indices[k][j] = exp_search(ctx->all_exps, ctx->nb_exps, exp);
         }
     }
 
-    fmpz_mpoly_clear(sum, ctx);
-    fmpz_mpoly_clear(m, ctx);
+    fmpz_mpoly_clear(sum, mctx);
+    fmpz_mpoly_clear(m, mctx);
     fmpz_clear(c);
     flint_free(exp);
 }
 
 static void
-acb_eval_fmpz_mpoly_vec(acb_t res, const fmpz_mpoly_vec_t pols, slong nb, acb_srcptr val,
-    const fmpz_mpoly_ctx_t ctx, slong prec)
+hecke_mpoly_ctx_clear(hecke_mpoly_ctx_t ctx)
 {
-    slong* all_exps;
-    slong* add_chain;
-    slong nb_all;
-    slong** indices;
-    fmpz** coeffs;
-    slong* nb_terms;
-    slong* max_degrees;
-    acb_ptr terms, temp;
+    slong k;
+
+    flint_free(ctx->add_chain);
+    flint_free(ctx->all_exps);
+    for (k = 0; k < ctx->nb_pols; k++)
+    {
+        _fmpz_vec_clear(ctx->coeffs[k], ctx->nb_terms[k]);
+        flint_free(ctx->indices[k]);
+    }
+    flint_free(ctx->coeffs);
+    flint_free(ctx->indices);
+    flint_free(ctx->nb_terms);
+    flint_free(ctx->max_degrees);
+    flint_free(ctx->ks);
+    flint_free(ctx->js);
+}
+
+/* ---------- Numerical Hecke action ---------- */
+
+static void
+hecke_mpoly_eval(acb_ptr res, acb_srcptr val, const hecke_mpoly_ctx_t ctx, slong prec)
+{
     acb_ptr* powers = flint_malloc(ACB_THETA_G2_COV_NB * sizeof(acb_ptr));
-    slong lmax, k, j;
-
-    indices = flint_malloc(nb * sizeof(slong*));
-    coeffs = flint_malloc(nb * sizeof(fmpz*));
-    nb_terms = flint_malloc(nb * sizeof(slong));
-    max_degrees = flint_malloc(ACB_THETA_G2_COV_NB * sizeof(slong));
-
-    /* Get addition chains */
-    flint_printf("addition chains:\n");
-    TIMEIT_ONCE_START;
-    set_add_chains(&all_exps, &add_chain, &nb_all, indices, coeffs, nb_terms, max_degrees,
-        &lmax, pols, nb, ctx);
-    TIMEIT_ONCE_STOP;
+    acb_ptr terms, temp;
+    slong k, j;
 
     /* Get powers */
     for (k = 0; k < ACB_THETA_G2_COV_NB; k++)
     {
-        powers[k] = _acb_vec_init(max_degrees[k] + 1);
-        _acb_vec_set_powers(powers[k], &val[k], max_degrees[k] + 1, prec);
+        powers[k] = _acb_vec_init(ctx->max_degrees[k] + 1);
+        _acb_vec_set_powers(powers[k], &val[k], ctx->max_degrees[k] + 1, prec);
     }
-    terms = _acb_vec_init(nb_all);
-    temp = _acb_vec_init(lmax);
+    terms = _acb_vec_init(ctx->nb_exps);
+    temp = _acb_vec_init(ctx->lmax);
 
     /* Get all terms */
-    flint_printf("all terms:\n");
-    TIMEIT_START;
-    for (k = 0; k < nb_all; k++)
+    for (k = 0; k < ctx->nb_exps; k++)
     {
-        if (add_chain[2 * k] == -1)
+        if (ctx->add_chain[2 * k] == -1)
         {
             acb_one(&terms[k]);
             for (j = 0; j < ACB_THETA_G2_COV_NB; j++)
             {
                 acb_mul(&terms[k], &terms[k],
-                    &powers[j][all_exps[k * ACB_THETA_G2_COV_NB + j]], prec);
+                    &powers[j][ctx->all_exps[k * ACB_THETA_G2_COV_NB + j]], prec);
             }
         }
         else
         {
-            acb_mul(&terms[k], &terms[add_chain[2 * k]], &terms[add_chain[2 * k + 1]], prec);
+            acb_mul(&terms[k], &terms[ctx->add_chain[2 * k]],
+                &terms[ctx->add_chain[2 * k + 1]], prec);
         }
     }
-    TIMEIT_STOP;
 
-    flint_printf("all dots:\n");
-    TIMEIT_START;
     /* Get dots */
-    for (k = 0; k < nb; k++)
+    for (k = 0; k < ctx->nb_pols; k++)
     {
-        for (j = 0; j < nb_terms[k]; j++)
+        for (j = 0; j < ctx->nb_terms[k]; j++)
         {
-            acb_set(&temp[j], &terms[indices[k][j]]);
+            acb_set(&temp[j], &terms[ctx->indices[k][j]]);
         }
-        acb_dot_fmpz(&res[k], NULL, 0, temp, 1, coeffs[k], 1, nb_terms[k], prec);
+        acb_dot_fmpz(&res[k], NULL, 0, temp, 1, ctx->coeffs[k], 1, ctx->nb_terms[k], prec);
     }
-    TIMEIT_STOP;
 
-    for (k = 0; k < nb; k++)
-    {
-        flint_free(indices[k]);
-        _fmpz_vec_clear(coeffs[k], nb_terms[k]);
-    }
     for (k = 0; k < ACB_THETA_G2_COV_NB; k++)
     {
-        _acb_vec_clear(powers[k], max_degrees[k] + 1);
+        _acb_vec_clear(powers[k], ctx->max_degrees[k] + 1);
     }
-    flint_free(all_exps);
-    flint_free(add_chain);
-    flint_free(indices);
-    flint_free(coeffs);
-    flint_free(nb_terms);
-    flint_free(max_degrees);
     flint_free(powers);
-    _acb_vec_clear(terms, nb_all);
-    _acb_vec_clear(temp, lmax);
+    _acb_vec_clear(terms, ctx->nb_exps);
+    _acb_vec_clear(temp, ctx->lmax);
 }
-
-/* /\* ---------- Numerical Hecke action ---------- *\/ */
 
 /* Add term corresponding to k^th coset to all matrices */
 static void
-hecke_add_term(acb_mat_struct* hecke, const fmpz_mpoly_vec_t pols, slong nb_spaces,
+hecke_add_term(acb_mat_struct* hecke, slong nb_spaces,
     const slong* dims, slong* pols_indices, const acb_mat_struct* taus,
     slong max_dim, slong k, slong p,
-    int is_T1, const fmpz_mpoly_ctx_t ctx, slong prec)
+    int is_T1, const hecke_mpoly_ctx_t ctx, slong prec)
 {
     fmpz_mat_t mat;
     acb_mat_t w, c, cinv;
@@ -822,16 +822,11 @@ hecke_add_term(acb_mat_struct* hecke, const fmpz_mpoly_vec_t pols, slong nb_spac
     (is_T1 ? hecke_T1_coset(mat, k, p) : hecke_coset(mat, k, p));
     for (j = 0; j < max_dim; j++)
     {
-        flint_printf("theta:\n");
-        TIMEIT_START;
-        
         acb_siegel_transform_cocycle_inv(w, c, cinv, mat, &taus[j], prec);
         acb_theta_g2_sextic(r, w, prec);
         acb_theta_g2_detk_symj(r, cinv, r, -2, 6, prec);
         acb_theta_g2_covariants_lead(basic, r, prec);
-        TIMEIT_STOP;
-
-        acb_eval_fmpz_mpoly_vec(res, pols, nb, basic, ctx, prec);
+        hecke_mpoly_eval(res, basic, ctx, prec);
 
         for (i = 0; i < nb_spaces; i++)
         {
@@ -857,9 +852,9 @@ hecke_add_term(acb_mat_struct* hecke, const fmpz_mpoly_vec_t pols, slong nb_spac
 }
 
 static void
-hecke_source(acb_mat_struct* source, const fmpz_mpoly_vec_t pols, slong nb_spaces,
+hecke_source(acb_mat_struct* source, slong nb_spaces,
     const slong* dims, const slong* pols_indices, const acb_mat_struct* taus,
-    slong max_dim, const fmpz_mpoly_ctx_t ctx, slong prec)
+    slong max_dim, const hecke_mpoly_ctx_t ctx, slong prec)
 {
     acb_poly_t r;
     acb_ptr basic;
@@ -875,7 +870,7 @@ hecke_source(acb_mat_struct* source, const fmpz_mpoly_vec_t pols, slong nb_space
     {
         acb_theta_g2_sextic(r, &taus[j], prec);
         acb_theta_g2_covariants_lead(basic, r, prec);
-        acb_eval_fmpz_mpoly_vec(res, pols, nb, basic, ctx, prec);
+        hecke_mpoly_eval(res, basic, ctx, prec);
 
         for (i = 0; i < nb_spaces; i++)
         {
@@ -936,9 +931,9 @@ hecke_generate_base_points(acb_mat_struct* tau, slong max_dim, slong prec)
 }
 
 static int
-hecke_attempt(fmpq_mat_struct* mats, const fmpz_mpoly_vec_t pols, slong nb_spaces,
+hecke_attempt(fmpq_mat_struct* mats, slong nb_spaces,
     slong* dims, slong* pols_indices, slong max_dim, slong p, int is_T1,
-    const fmpz_mpoly_ctx_t ctx, slong prec)
+    const hecke_mpoly_ctx_t ctx, slong prec)
 {
     acb_mat_struct* tau;
     acb_mat_struct* hecke;
@@ -968,7 +963,7 @@ hecke_attempt(fmpq_mat_struct* mats, const fmpz_mpoly_vec_t pols, slong nb_space
     hecke_generate_base_points(tau, max_dim, prec);
 
     flint_printf("(hecke_attempt) evaluating covariants at base points...\n");
-    hecke_source(source, pols, nb_spaces, dims, pols_indices, tau, max_dim, ctx, prec);
+    hecke_source(source, nb_spaces, dims, pols_indices, tau, max_dim, ctx, prec);
     for (k = 0; (k < nb_spaces) && res; k++)
     {
         res = acb_mat_inv(&source[k], &source[k], prec);
@@ -981,7 +976,7 @@ hecke_attempt(fmpq_mat_struct* mats, const fmpz_mpoly_vec_t pols, slong nb_space
         {
             flint_printf("%wd/%wd\n", k, nb);
         }
-        hecke_add_term(hecke, pols, nb_spaces, dims, pols_indices, tau, max_dim,
+        hecke_add_term(hecke, nb_spaces, dims, pols_indices, tau, max_dim,
             k, p, is_T1, ctx, prec);
     }
 
@@ -990,7 +985,8 @@ hecke_attempt(fmpq_mat_struct* mats, const fmpz_mpoly_vec_t pols, slong nb_space
     for (k = 0; (k < nb_spaces) && res; k++)
     {
         acb_mat_mul(&hecke[k], &hecke[k], &source[k], prec);
-        covariant_weight(&k0, &j0, fmpz_mpoly_vec_entry(pols, pols_indices[k]), ctx);
+        k0 = ctx->ks[pols_indices[k]];
+        j0 = ctx->js[pols_indices[k]];
         acb_set_si(f, p);
         if (is_T1)
         {
@@ -1058,6 +1054,7 @@ int main(int argc, const char *argv[])
     fmpz_mpoly_vec_t pols;
     slong* pols_indices;
     fmpz_mpoly_ctx_t ctx;
+    hecke_mpoly_ctx_t hecke_ctx;
     fmpq_mat_struct* mats;
     FILE* file_out;
     slong k, j;
@@ -1093,6 +1090,9 @@ int main(int argc, const char *argv[])
 
     parse_covariants(pols, nb_spaces, dims, pols_indices, argv[2], ctx);
 
+    flint_printf("(hecke) precomputing additions chains...\n");
+    hecke_mpoly_ctx_init(hecke_ctx, pols, pols_indices[nb_spaces], ctx);
+
     /* Get p, is_T1, max_dim */
     if (n_is_prime(q))
     {
@@ -1119,13 +1119,13 @@ int main(int argc, const char *argv[])
     {
         max_dim = FLINT_MAX(max_dim, dims[k]);
     }
-    flint_printf("(hecke) max_dim = %wd\n", max_dim);
+    flint_printf("(hecke) done; max_dim = %wd\n", max_dim);
 
-    prec = 200;
+    prec = 500;
     while (!done)
     {
-        done = hecke_attempt(mats, pols, nb_spaces, dims, pols_indices,
-            max_dim, p, is_T1, ctx, prec);
+        done = hecke_attempt(mats, nb_spaces, dims, pols_indices,
+            max_dim, p, is_T1, hecke_ctx, prec);
         prec *= 2;
     }
 
@@ -1151,6 +1151,7 @@ int main(int argc, const char *argv[])
     flint_free(mats);
     flint_free(dims);
     fmpz_mpoly_ctx_clear(ctx);
+    hecke_mpoly_ctx_clear(hecke_ctx);
 
     flint_cleanup();
     return 0;
