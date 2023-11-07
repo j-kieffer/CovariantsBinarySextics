@@ -241,7 +241,7 @@ class SMF(SageObject):
                 if k < d - 1:
                     f.write("\n\n")
 
-    # This computes the Hecke action on full basis up to some cofactor
+    # This computes the Hecke action on full basis
     def HeckeAction(self, q, filename="../data/temp", log=True):
         self.WriteBasisToFile(filename + ".in", "w")
         call = ["./hecke.exe", "{}".format(q), filename + ".in", filename + ".out"]
@@ -358,12 +358,13 @@ def SMFPrecomputedScalarBasis(k):
     else:
         return None
 
-def WriteAllSpaces(kbound = 20, jbound = 20, filename = "../data/all.in"):
+def WriteAllSpaces(kbound = 16, jbound = 16, dimbound = 6, filename = "../data/all.in"):
     mode = "w"
     for j in range(0, jbound + 1, 2):
         for k in range(kbound + 1):
             print("\nDoing (k,j) = ({},{})".format(k, j))
             S = SMF(k, j)
-            if S.Dimension() > 0:
+            d = S.Dimension()
+            if d > 0 and d <= dimbound:
                 S.WriteDecompositionToFile(filename, mode);
                 mode = "a"
