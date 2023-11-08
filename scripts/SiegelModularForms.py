@@ -394,7 +394,7 @@ def WriteAllSpaces(kbound = 24, jbound = 16, dimbound = 6, filename = "../data/a
 
 def WritePrimes(bound = 200, filename = "../data/primes.in"):
     with open(filename, "w") as f:
-        for j in range(2, bound + 1):
+        for j in range(bound, 1, -1):
             if ZZ(j).is_prime():
                 f.write(str(j))
                 f.write("\n")

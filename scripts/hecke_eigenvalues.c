@@ -15,9 +15,11 @@ y in the associated number field, and is represented as the list of integers
 Tr(y), Tr(xy), ..., Tr(x^(d-1) y). The result is always certified assuming that
 the input is indeed an eigenform.
 
-parallel run: (increase j and number of primes for larger computation)
+parallel run: in tmux, (increase j and number of primes for larger computation)
 
 time parallel -j1 --joblog data/log/joblog.txt --results data/log --eta scripts/hecke_eigenvalues.exe {1} data/all.in data/{1}.dat :::: data/primes_20.in > data/log/stdout.txt
+
+then ctrl+b then d to detach, can close terminal, and finally tmux attach.
 */
 
 #include "fmpz_poly.h"
