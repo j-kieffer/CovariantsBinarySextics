@@ -13,65 +13,11 @@ action (T(p) if q=p is prime, T_1(p^2) if q=p^2) on the input space as a matrix
 with rational coefficients. If a given matrix is proved to be integral by other
 means, then the result is integral and certified. */
 
+#include "fmpq.h"
+#include "fmpq_mat.h"
 #include "hecke.c"
 
 /* ---------- Read input ---------- */
-
-static void
-parse_integers(slong* nb_spaces, slong** dims, const char* filename_in)
-{
-    FILE* file_in;
-    char* str;
-    size_t nb, nb_prev;
-    slong dim;
-
-    file_in = fopen(filename_in, "r");
-    if (file_in == NULL)
-    {
-        flint_printf("Error: could not read file %s\n", filename_in);
-        flint_abort();
-    }
-
-    *nb_spaces = 0;
-    dim = 0;
-    nb_prev = 0;
-
-    while (!feof(file_in))
-    {
-        str = NULL;
-        nb = 0;
-        getline(&str, &nb, file_in);
-        str[strcspn(str, "\n")] = 0; /* remove final newline */
-        nb = strcspn(str, "");
-        /* flint_printf("(parse_integers) read line with nb = %wd, nb_prev = %wd\n", nb, nb_prev);
-           flint_printf("line: %s\n", str); */
-        flint_free(str);
-
-        if (nb > 0 && nb_prev == 0)
-        {
-            (*nb_spaces)++;
-            *dims = flint_realloc(*dims, (*nb_spaces + 1) * sizeof(slong));
-            dim = 1;
-        }
-        else if (nb > 0)
-        {
-            dim++;
-        }
-        else if (nb == 0 && nb_prev > 0)
-        {
-            (*dims)[*nb_spaces - 1] = dim;
-            dim = 0;
-        }
-        nb_prev = nb;
-    }
-
-    if (nb_prev > 0)
-    {
-        (*dims)[*nb_spaces - 1] = dim;
-        dim = 0;
-    }
-    fclose(file_in);
-}
 
 static void
 parse_covariants(fmpz_mpoly_vec_t pols, slong nb_spaces, const slong* dims,
@@ -454,15 +400,7 @@ hecke_attempt(fmpq_mat_struct* mats, slong nb_spaces,
         acb_mat_mul(&hecke[k], &hecke[k], &source[k], prec);
         k0 = ctx->ks[pols_indices[k]];
         j0 = ctx->js[pols_indices[k]];
-        acb_set_si(f, p);
-        if (is_T1)
-        {
-            acb_pow_si(f, f, 4 * k0 + 2 * j0 - 6, prec);
-        }
-        else
-        {
-            acb_pow_si(f, f, 2 * k0 + j0 - 3, prec);
-        }
+        hecke_rescale(f, k0, j0, p, is_T1, prec);
         acb_mat_scalar_mul_acb(&hecke[k], &hecke[k], f, prec);
 
         flint_printf("(hecke_attempt) found Hecke matrix on space number %wd:\n", k);
@@ -556,37 +494,16 @@ int main(int argc, const char *argv[])
     fmpz_mpoly_vec_init(pols, pols_indices[nb_spaces], ctx);
 
     parse_covariants(pols, nb_spaces, dims, pols_indices, argv[2], ctx);
-
-    flint_printf("(hecke) precomputing additions chains...\n");
-    hecke_mpoly_ctx_init(hecke_ctx, pols, pols_indices[nb_spaces], ctx);
-
-    /* Get p, is_T1, max_dim */
-    if (n_is_prime(q))
-    {
-        p = q;
-        is_T1 = 0;
-    }
-    else
-    {
-        if (!n_is_square(q))
-        {
-            flint_printf("Error: q must be prime or the square of a prime, got %wd\n", q);
-            flint_abort();
-        }
-        p = n_sqrt(q);
-        if (!n_is_prime(p))
-        {
-            flint_printf("Error: q must be prime or the square of a prime, got %wd\n", q * q);
-            flint_abort();
-        }
-        is_T1 = 1;
-    }
+    get_p_from_q(&p, &is_T1, q);
     max_dim = 0;
     for (k = 0; k < nb_spaces; k++)
     {
         max_dim = FLINT_MAX(max_dim, dims[k]);
     }
-    flint_printf("(hecke) done; max_dim = %wd\n", max_dim);
+
+    flint_printf("(hecke) precomputing additions chains...\n");
+    hecke_mpoly_ctx_init(hecke_ctx, pols, pols_indices[nb_spaces], ctx);
+    flint_printf("(hecke) done\n");
 
     prec = 500;
     while (!done)

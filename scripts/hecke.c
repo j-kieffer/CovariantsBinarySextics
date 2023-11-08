@@ -4,8 +4,6 @@
 #include <string.h>
 #include "fmpz_vec.h"
 #include "fmpz_mpoly.h"
-#include "fmpq.h"
-#include "fmpq_mat.h"
 #include "acb_theta.h"
 #include "profiler.h"
 
@@ -13,6 +11,31 @@
 
 #define COV_K {1,2,2,2,3,3,3,3,4,4,4,4,5,5,5,6,6,6,7,7,8,9,10,10,12,15}
 #define COV_J {6,0,4,8,2,6,8,12,0,4,6,10,2,4,8,0,6,6,2,4,2,4,0,2,2,0}
+
+static void
+get_p_from_q(slong* p, int* is_T1, slong q)
+{
+    if (n_is_prime(q))
+    {
+        *p = q;
+        *is_T1 = 0;
+    }
+    else
+    {
+        if (!n_is_square(q))
+        {
+            flint_printf("Error: q must be prime or the square of a prime, got %wd\n", q);
+            flint_abort();
+        }
+        *p = n_sqrt(q);
+        if (!n_is_prime(*p))
+        {
+            flint_printf("Error: q must be prime or the square of a prime, got %wd\n", q);
+            flint_abort();
+        }
+        *is_T1 = 1;
+    }
+}
 
 static void
 covariant_weight(slong* k, slong* j, const fmpz_mpoly_t pol, const fmpz_mpoly_ctx_t ctx)
@@ -36,6 +59,20 @@ covariant_weight(slong* k, slong* j, const fmpz_mpoly_t pol, const fmpz_mpoly_ct
         *j += e[i] * jlist[i];
     }
     *k -= (*j/2);
+}
+
+static void
+hecke_rescale(acb_t f, slong k, slong j, slong p, int is_T1, slong prec)
+{
+    acb_set_si(f, p);
+    if (is_T1)
+    {
+        acb_pow_si(f, f, 4 * k + 2 * j - 6, prec);
+    }
+    else
+    {
+        acb_pow_si(f, f, 2 * k + j - 3, prec);
+    }
 }
 
 static slong
@@ -535,4 +572,62 @@ hecke_generate_base_points(acb_mat_struct* tau, slong max_dim, slong prec)
     arf_clear(t);
     arb_mat_clear(x);
     arb_mat_clear(y);
+}
+
+/* ---------- Read input ---------- */
+
+static void
+parse_integers(slong* nb_spaces, slong** dims, const char* filename_in)
+{
+    FILE* file_in;
+    char* str;
+    size_t nb, nb_prev;
+    slong dim;
+
+    file_in = fopen(filename_in, "r");
+    if (file_in == NULL)
+    {
+        flint_printf("Error: could not read file %s\n", filename_in);
+        flint_abort();
+    }
+
+    *nb_spaces = 0;
+    dim = 0;
+    nb_prev = 0;
+
+    while (!feof(file_in))
+    {
+        str = NULL;
+        nb = 0;
+        getline(&str, &nb, file_in);
+        str[strcspn(str, "\n")] = 0; /* remove final newline */
+        nb = strcspn(str, "");
+        /* flint_printf("(parse_integers) read line with nb = %wd, nb_prev = %wd\n", nb, nb_prev);
+           flint_printf("line: %s\n", str); */
+        flint_free(str);
+
+        if (nb > 0 && nb_prev == 0)
+        {
+            (*nb_spaces)++;
+            *dims = flint_realloc(*dims, (*nb_spaces + 1) * sizeof(slong));
+            dim = 1;
+        }
+        else if (nb > 0)
+        {
+            dim++;
+        }
+        else if (nb == 0 && nb_prev > 0)
+        {
+            (*dims)[*nb_spaces - 1] = dim;
+            dim = 0;
+        }
+        nb_prev = nb;
+    }
+
+    if (nb_prev > 0)
+    {
+        (*dims)[*nb_spaces - 1] = dim;
+        dim = 0;
+    }
+    fclose(file_in);
 }
