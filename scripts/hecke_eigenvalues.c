@@ -1,5 +1,5 @@
 /* Compilation:
-gcc -I/home/jean/install/include/flint -I/home/jean/install/include hecke_eigenvalues.c -L/home/jean/install/lib -lflint -lgmp -o hecke_eigenvalues.exe
+gcc -I/home/jean/install/include/flint -I/home/jean/install/include hecke_eigenvalues.c -L/home/jean/install/lib -lflint -lgmp -lm -o hecke_eigenvalues.exe
 
 Usage:
 ./hecke_eigenvalues.exe q filename_in filename_out
@@ -13,7 +13,12 @@ encoded as multivariate polynomials in Co16, etc. with integral coefficients.
 A list of eigenvalues is printed to filename_out. Each eigenvalue is an integer
 y in the associated number field, and is represented as the list of integers
 Tr(y), Tr(xy), ..., Tr(x^(d-1) y). The result is always certified assuming that
-the input is indeed an eigenform. */
+the input is indeed an eigenform.
+
+parallel run: (increase j and number of primes for larger computation)
+
+time parallel -j1 --joblog data/log/joblog.txt --results data/log --eta scripts/hecke_eigenvalues.exe {1} data/all.in data/{1}.dat :::: data/primes_20.in
+*/
 
 #include "fmpz_poly.h"
 #include "arb_fmpz_poly.h"
