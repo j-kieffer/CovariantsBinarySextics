@@ -26,13 +26,18 @@ parse_covariants(fmpz_mpoly_vec_t pols, fmpz_poly_struct* fields, slong nb_space
     const slong* dims, const slong* pols_indices, const char* filename_in,
     const fmpz_mpoly_ctx_t ctx)
 {
+    fmpz_mpoly_ctx_t univ_ctx;
+    fmpz_mpoly_t univ;
     char** vars;
+    char* varx[] = {"x"};
     char* str;
     size_t nb;
     FILE* file_in;
     slong inds[ACB_THETA_G2_COV_NB] = {16, 20, 24, 28, 32, 36, 38, 312, 40, 44, 46, 410, 52, 54, 58, 60, 661, 662, 72, 74, 82, 94, 100, 102, 122, 150};
     slong k, j;
 
+    fmpz_mpoly_ctx_init(univ_ctx, 1, ORD_LEX);
+    fmpz_mpoly_init(univ, univ_ctx);
     vars = flint_malloc(ACB_THETA_G2_COV_NB * sizeof(char*));
     for (k = 0; k < ACB_THETA_G2_COV_NB; k++)
     {
@@ -54,7 +59,11 @@ parse_covariants(fmpz_mpoly_vec_t pols, fmpz_poly_struct* fields, slong nb_space
         nb = 0;
         getline(&str, &nb, file_in);
         str[strcspn(str, "\n")] = 0; /* remove final newline */
-        fmpz_poly_set_str(&fields[k], "x");
+        fmpz_mpoly_set_str_pretty(univ, str, (const char**) varx, univ_ctx);
+        fmpz_mpoly_get_fmpz_poly(&fields[k], univ, 0, univ_ctx);
+        flint_printf("(parse_covariants) k = %wd, field:\n", k);
+        fmpz_poly_print_pretty(&fields[k], "x");
+        flint_printf("\n");
         flint_free(str);
 
         /* Get covariants */
@@ -67,6 +76,10 @@ parse_covariants(fmpz_mpoly_vec_t pols, fmpz_poly_struct* fields, slong nb_space
             fmpz_mpoly_set_str_pretty(fmpz_mpoly_vec_entry(pols, pols_indices[k] + j),
                 str, (const char**) vars, ctx);
             flint_free(str);
+            flint_printf("(parse_covariants) k = %wd, j = %wd, poly:\n", k, j);
+            fmpz_mpoly_print_pretty(fmpz_mpoly_vec_entry(pols, pols_indices[k] + j),
+                (const char**) vars, ctx);
+            flint_printf("\n");
         }
 
         if (!feof(file_in))
@@ -85,6 +98,8 @@ parse_covariants(fmpz_mpoly_vec_t pols, fmpz_poly_struct* fields, slong nb_space
         }
     }
 
+    fmpz_mpoly_clear(univ, univ_ctx);
+    fmpz_mpoly_ctx_clear(univ_ctx);
     fclose(file_in);
     for (k = 0; k < ACB_THETA_G2_COV_NB; k++)
     {
@@ -152,32 +167,39 @@ hecke_source(acb_ptr source, const acb_mat_t tau, const hecke_mpoly_ctx_t ctx, s
 }
 
 static int
-hecke_set_eigenvalues(fmpz* eigenvalues, acb_srcptr hecke, const fmpz_poly_t field, slong prec)
+hecke_set_eigenvalues(fmpz* eigenvalues, acb_srcptr hecke, acb_srcptr source,
+    const fmpz_poly_t field, slong prec)
 {
     slong d = fmpz_poly_degree(field);
-    acb_ptr roots;
-    acb_ptr pow;
+    acb_ptr roots, pow, source_embed, hecke_embed;
     acb_t z;
-    slong k, j;
-    int res;
+    slong k;
+    int res = 1;
+
+    flint_printf("(set_eigenvalues) d = %wd, field:\n", d);
+    fmpz_poly_print(field);
+    flint_printf("\n");
 
     roots = _acb_vec_init(d);
-    pow = _acb_vec_init(2 * d * d);
+    pow = _acb_vec_init(d * d);
+    source_embed = _acb_vec_init(d);
+    hecke_embed = _acb_vec_init(d);
     acb_init(z);
 
     arb_fmpz_poly_complex_roots(roots, field, 0, prec);
 
     for (k = 0; k < d; k++)
     {
-        _acb_vec_set_powers(pow + 2 * k * d, &roots[k], 2 * d, prec);
+        _acb_vec_set_powers(pow + k * d, &roots[k], d, prec);
+        acb_dot(&source_embed[k], NULL, 0, source, 1, pow + k * d, 1, d, prec);
+        acb_dot(&hecke_embed[k], NULL, 0, hecke, 1, pow + k * d, 1, d, prec);
+        acb_div(&hecke_embed[k], &hecke_embed[k], &source_embed[k], prec);
     }
     for (k = 0; (k < d) && res; k++)
     {
-        acb_zero(z);
-        for (j = 0; j < d; j++)
-        {
-            acb_dot(z, z, 0, hecke, 1, pow + 2 * j * d + k, 1, d, prec);
-        }
+        acb_dot(z, NULL, 0, hecke_embed, 1, pow + k, d, d, prec);
+        acb_printd(z, 5);
+        flint_printf("\n");
         res = acb_get_unique_fmpz(&eigenvalues[k], z);
         if (!acb_contains_int(z))
         {
@@ -189,7 +211,9 @@ hecke_set_eigenvalues(fmpz* eigenvalues, acb_srcptr hecke, const fmpz_poly_t fie
     }
 
     _acb_vec_clear(roots, d);
-    _acb_vec_clear(pow, 2 * d * d);
+    _acb_vec_clear(pow, d * d);
+    _acb_vec_clear(source_embed, d);
+    _acb_vec_clear(hecke_embed, d);
     acb_clear(z);
     return res;
 }
@@ -220,11 +244,9 @@ hecke_attempt(fmpz* eigenvalues, const fmpz_poly_t fields, slong nb_spaces,
 
     flint_printf("(hecke_attempt) evaluating covariants at base point...\n");
     hecke_source(source, tau, ctx, prec);
-    for (k = 0; (k < nb_spaces) && res; k++)
-    {
-        acb_inv(&source[k], &source[k], prec);
-        res = acb_is_finite(&source[k]);
-    }
+
+    flint_printf("found source:\n");
+    _acb_vec_printd(source, len, 5);
 
     flint_printf("(hecke_attempt) evaluating Hecke action...\n");
     for (k = 0; (k < nb) && res; k++)
@@ -236,10 +258,8 @@ hecke_attempt(fmpz* eigenvalues, const fmpz_poly_t fields, slong nb_spaces,
         hecke_add_term(hecke, len, tau, k, p, is_T1, ctx, prec);
     }
 
-    for (k = 0; k < len; k++)
-    {
-        acb_mul(&hecke[k], &hecke[k], &source[k], prec);
-    }
+    flint_printf("found hecke:\n");
+    _acb_vec_printd(hecke, len, 5);
 
     /* Get traces of eigenvalue on each eigenform */
     flint_printf("(hecke_attempt) recognizing integers...\n");
@@ -251,7 +271,7 @@ hecke_attempt(fmpz* eigenvalues, const fmpz_poly_t fields, slong nb_spaces,
         _acb_vec_scalar_mul(hecke + pols_indices[k], hecke + pols_indices[k],
             dims[k], f, prec);
         res = hecke_set_eigenvalues(eigenvalues + pols_indices[k], hecke + pols_indices[k],
-            &fields[k], prec);
+            source + pols_indices[k], &fields[k], prec);
 
         if (res)
         {
@@ -339,7 +359,7 @@ int main(int argc, const char *argv[])
     hecke_mpoly_ctx_init(hecke_ctx, pols, pols_indices[nb_spaces], ctx);
     flint_printf("(hecke) done\n");
 
-    prec = 200;
+    prec = 400;
     while (!done)
     {
         done = hecke_attempt(eigenvalues, fields, nb_spaces, dims, pols_indices,
@@ -358,6 +378,7 @@ int main(int argc, const char *argv[])
         for (j = 0; j < dims[k]; j++)
         {
             fmpz_fprint(file_out, &eigenvalues[pols_indices[k] + j]);
+            flint_fprintf(file_out, "\n");
         }
         fprintf(file_out, "\n");
     }

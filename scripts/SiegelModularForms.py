@@ -282,12 +282,17 @@ class SMF(SageObject):
             #print("Found eigenvalue with minimal polynomial {}".format(pol))
             if pol.degree() == 1:
                 F = QQ
+                root = pol.roots()[0][0]
             else:
                 R = pol.parent()
                 newpol = R(pari.polredabs(pol))
                 F = NumberField(newpol, "a")
+                root = F(pari.nfroots(F, pol)[0])
+            print("Hecke decomposition: found factor and number field")
+            print(pol)
+            print(F)
             fields.append(F)
-            roots.append(pol.roots(F)[0][0])
+            roots.append(root)
         self.fields = fields
 
         for k in range(len(self.fields)):
@@ -374,10 +379,12 @@ def SMFPrecomputedScalarBasis(k):
     else:
         return None
 
-def WriteAllSpaces(kbound = 16, jbound = 16, dimbound = 6, filename = "../data/all.in"):
+def WriteAllSpaces(kbound = 24, jbound = 16, dimbound = 6, filename = "../data/all.in"):
     mode = "w"
     for j in range(0, jbound + 1, 2):
         for k in range(kbound + 1):
+            if k == 0 and j == 0:
+                continue
             print("\nDoing (k,j) = ({},{})".format(k, j))
             S = SMF(k, j)
             d = S.Dimension()
