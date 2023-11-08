@@ -230,9 +230,12 @@ class SMF(SageObject):
         with open(filename, mode) as f:
             if mode == "a":
                 f.write("\n\n")
+            F = self.HeckeFields()
             D = self.HeckeDecomposition()
             d = len(D)
             for k in range(d):
+                f.write(str(F[k].defining_polynomial()))
+                f.write("\n")
                 e = len(D[k])
                 for l in range(e):
                     f.write(str(D[k][l]))
@@ -262,6 +265,9 @@ class SMF(SageObject):
         subprocess.run(["rm", filename + ".out"])
         return M
 
+    # This computes a list of Hecke fields as QQ(x)/f_i(x) and lists of
+    # covariants over QQ [c^i_0, ..., c_i^{d-1}] such that \sum c^i_k x^k is a
+    # Hecke eigenform
     def HeckeDecomposition(self):
         if not self.decomposition is None:
             return self.decomposition
@@ -270,34 +276,44 @@ class SMF(SageObject):
         fac = M.characteristic_polynomial().factor()
         res = []
         fields = []
+        roots = []
         for k in range(len(fac)):
             pol = fac[k][0]
             #print("Found eigenvalue with minimal polynomial {}".format(pol))
-            F = NumberField(pol, "a")
-            B = F.integral_basis()
-            N = Matrix(F, M) - F.gen()
-            V = N.left_kernel().basis()
+            if pol.degree() == 1:
+                F = QQ
+            else:
+                R = pol.parent()
+                newpol = R(pari.polredabs(pol))
+                F = NumberField(newpol, "a")
+            fields.append(F)
+            roots.append(pol.roots(F)[0][0])
+        self.fields = fields
+
+        for k in range(len(self.fields)):
+            F = self.fields[k]
+            N = Matrix(F, M)
+            V = (N - roots[k]).left_kernel().basis()
             assert len(V) == 1, "Should find exactly one eigenvector"
             v = V[0].denominator() * V[0]; #coordinates of v are integers in F.
             #print("Found eigenvector {}".format(v))
 
-            QQ_basis = []
-            for l in range(pol.degree()):
-                w = B[l] * v
+            coefficients = []
+            g = ZZ(1)
+            for l in range(F.degree()):
+                if F is QQ:
+                    w = v
+                else:
+                    w = [y.polynomial().padded_list(F.degree())[l] for y in v]
                 elt = 0
                 for m in range(self.Dimension()):
-                    elt += ZZ(w[m].trace()) * self.basis[m]
-                elt = elt/elt.content()
-                QQ_basis.append(elt)
-            res.append(QQ_basis)
+                    elt += w[m] * self.basis[m]
+                coefficients.append(elt)
+                g = g.gcd(elt.content())
+            for l in range(F.degree()):
+                coefficients[l] = coefficients[l]/g
+            res.append(coefficients)
 
-            #Get polredabs
-            if F.degree() == 1:
-                fields.append(QQ)
-            else:
-                R = pol.parent()
-                pol = R(pari.polredabs(pol))
-                fields.append(NumberField(pol, "a"))
         self.decomposition = res
         self.fields = fields
         return res
