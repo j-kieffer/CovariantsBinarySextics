@@ -17,7 +17,7 @@ the input is indeed an eigenform.
 
 parallel run: (increase j and number of primes for larger computation)
 
-time parallel -j1 --joblog data/log/joblog.txt --results data/log --eta scripts/hecke_eigenvalues.exe {1} data/all.in data/{1}.dat :::: data/primes_20.in
+time parallel -j1 --joblog data/log/joblog.txt --results data/log --eta scripts/hecke_eigenvalues.exe {1} data/all.in data/{1}.dat :::: data/primes_20.in > data/log/stdout.txt
 */
 
 #include "fmpz_poly.h"
@@ -171,13 +171,15 @@ hecke_source(acb_ptr source, const acb_mat_t tau, const hecke_mpoly_ctx_t ctx, s
     _acb_vec_clear(basic, ACB_THETA_G2_COV_NB);
 }
 
+/* returns excess precision if positive, 0 if fail */
 static int
-hecke_set_eigenvalues(fmpz* eigenvalues, acb_srcptr hecke, acb_srcptr source,
-    const fmpz_poly_t field, slong prec)
+hecke_set_eigenvalues(fmpz* eigenvalues, slong* margin, acb_srcptr hecke,
+    acb_srcptr source, const fmpz_poly_t field, slong prec)
 {
     slong d = fmpz_poly_degree(field);
     acb_ptr roots, pow, source_embed, hecke_embed;
     acb_t z;
+    mag_t u;
     slong k;
     int res = 1;
 
@@ -186,6 +188,8 @@ hecke_set_eigenvalues(fmpz* eigenvalues, acb_srcptr hecke, acb_srcptr source,
     source_embed = _acb_vec_init(d);
     hecke_embed = _acb_vec_init(d);
     acb_init(z);
+    mag_init(u);
+    *margin = 0;
 
     arb_fmpz_poly_complex_roots(roots, field, 0, prec);
 
@@ -205,6 +209,7 @@ hecke_set_eigenvalues(fmpz* eigenvalues, acb_srcptr hecke, acb_srcptr source,
             flint_printf("(set_eigenvalues) not enough precision: ");
             acb_printd(z, 10);
             flint_printf("\n");
+            *margin = 0;
         }
         if (!acb_contains_int(z))
         {
@@ -213,6 +218,16 @@ hecke_set_eigenvalues(fmpz* eigenvalues, acb_srcptr hecke, acb_srcptr source,
             flint_printf("\n");
             flint_abort();
         }
+        acb_sub_fmpz(z, z, &eigenvalues[k], prec);
+        acb_get_mag(u, z);
+        if (k == 0)
+        {
+            *margin = ceil(- mag_get_d_log2_approx(u));
+        }
+        else
+        {
+            *margin = FLINT_MIN(*margin, ceil(- mag_get_d_log2_approx(u)));
+        }
     }
 
     _acb_vec_clear(roots, d);
@@ -220,6 +235,7 @@ hecke_set_eigenvalues(fmpz* eigenvalues, acb_srcptr hecke, acb_srcptr source,
     _acb_vec_clear(source_embed, d);
     _acb_vec_clear(hecke_embed, d);
     acb_clear(z);
+    mag_clear(u);
     return res;
 }
 
@@ -236,6 +252,7 @@ hecke_attempt(fmpz* eigenvalues, const fmpz_poly_t fields, slong nb_spaces,
     slong k, j, l;
     slong k0, j0;
     slong nb = (is_T1 ? hecke_nb_T1(p) : hecke_nb(p));
+    slong margin, m;
     int res = 1;
 
     /* Init */
@@ -271,13 +288,21 @@ hecke_attempt(fmpz* eigenvalues, const fmpz_poly_t fields, slong nb_spaces,
         hecke_rescale(f, k0, j0, p, is_T1, prec);
         _acb_vec_scalar_mul(hecke + pols_indices[k], hecke + pols_indices[k],
             dims[k], f, prec);
-        res = hecke_set_eigenvalues(eigenvalues + pols_indices[k], hecke + pols_indices[k],
-            source + pols_indices[k], &fields[k], prec);
+        res = hecke_set_eigenvalues(eigenvalues + pols_indices[k], &m,
+            hecke + pols_indices[k], source + pols_indices[k], &fields[k], prec);
+        if (k == 0)
+        {
+            margin = m;
+        }
+        else
+        {
+            margin = FLINT_MIN(margin, m);
+        }
     }
 
     if (res)
     {
-        flint_printf("Success!\n");
+        flint_printf("Success! Extra precision: %wd bits\n", margin);
     }
     else
     {
@@ -351,6 +376,7 @@ int main(int argc, const char *argv[])
     flint_printf("done\n");
 
     prec = 160 + 10 * ceil(10 * log((double) q));
+
     while (!done)
     {
         done = hecke_attempt(eigenvalues, fields, nb_spaces, dims, pols_indices,
