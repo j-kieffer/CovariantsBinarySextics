@@ -391,3 +391,13 @@ def WriteAllSpaces(kbound = 24, jbound = 16, dimbound = 6, filename = "../data/a
             if d > 0 and d <= dimbound:
                 S.WriteDecompositionToFile(filename, mode);
                 mode = "a"
+
+def WritePrimes(bound = 200, filename = "../data/primes.in"):
+    with open(filename, "w") as f:
+        for j in range(2, bound + 1):
+            if ZZ(j).is_prime():
+                f.write(str(j))
+                f.write("\n")
+                if j*j <= bound:
+                    f.write(str(j*j))
+                    f.write("\n")
