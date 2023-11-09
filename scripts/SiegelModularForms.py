@@ -258,15 +258,15 @@ class SMF(SageObject):
         else:
             s += " without character"
             i = 0
+        F = self.HeckeFields()
+        D = self.HeckeDecomposition()
+        d = len(D)
         with open(filename, mode) as f:
             if mode == "a":
                 f.write("\n\n")
-            F = self.HeckeFields()
-            D = self.HeckeDecomposition()
-            d = len(D)
             for k in range(d):
-                f.write(s + ", number {}\n")
-                f.write(str[i] + "\n")
+                f.write(s + ", number {}\n".format(k + 1))
+                f.write(str(i) + "\n")
                 f.write(str(F[k].defining_polynomial()))
                 f.write("\n")
                 e = len(D[k])
