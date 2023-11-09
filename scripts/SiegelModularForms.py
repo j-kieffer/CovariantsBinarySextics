@@ -227,17 +227,37 @@ class SMF(SageObject):
         return self.basis
 
     def WriteBasisToFile(self, filename, mode):
+        d = self.Dimension()
+        s = "Space of Siegel modular forms of weight ({}, {})".format(self.k, self.j)
+        if d == 0:
+            return
+        if self.character:
+            s += " with character\n"
+            i = 1
+        else:
+            s += " without character\n"
+            i = 0
         with open(filename, mode) as f:
             if mode == "a":
                 f.write("\n\n")
             B = self.GetBasis()
-            d = self.Dimension()
+            f.write(s)
+            f.write(str(i) + "\n")
             for k in range(d):
                 f.write(str(B[k]))
                 if k < d - 1:
                     f.write("\n")
 
     def WriteDecompositionToFile(self, filename, mode):
+        if self.Dimension() == 0:
+            return
+        s = "Eigenform of weight ({}, {})".format(self.k, self.j)
+        if self.character:
+            s += " with character"
+            i = 1
+        else:
+            s += " without character"
+            i = 0
         with open(filename, mode) as f:
             if mode == "a":
                 f.write("\n\n")
@@ -245,6 +265,8 @@ class SMF(SageObject):
             D = self.HeckeDecomposition()
             d = len(D)
             for k in range(d):
+                f.write(s + ", number {}\n")
+                f.write(str[i] + "\n")
                 f.write(str(F[k].defining_polynomial()))
                 f.write("\n")
                 e = len(D[k])
@@ -259,8 +281,6 @@ class SMF(SageObject):
     def HeckeAction(self, q, filename="../data/temp", log=True):
         self.WriteBasisToFile(filename + ".in", "w")
         call = ["./hecke_matrices.exe", "{}".format(q), filename + ".in", filename + ".out"]
-        if self.character:
-            call[1] = "./hecke_matrices_with_character.exe"
         run = subprocess.run(call, capture_output=True, check=True)
         subprocess.run(["rm", filename + ".in"])
         if log:
@@ -394,18 +414,19 @@ def SMFPrecomputedScalarBasis(k):
     else:
         return None
 
-def WriteAllSpaces(kbound = 24, jbound = 16, dimbound = 6, filename = "../data/all.in"):
+def WriteAllSpaces(kbound = 50, jbound = 16, dimbound = 6, filename = "../data/all.in"):
     mode = "w"
     for j in range(0, jbound + 1, 2):
         for k in range(kbound + 1):
             if k == 0 and j == 0:
                 continue
-            print("\nDoing (k,j) = ({},{})".format(k, j))
-            S = SMF(k, j)
-            d = S.Dimension()
-            if d > 0 and d <= dimbound:
-                S.WriteDecompositionToFile(filename, mode);
-                mode = "a"
+            for char in [False, True]:
+                print("\nDoing SMF({}, {}, character = {})".format(k, j, char))
+                S = SMF(k, j, character = char)
+                d = S.Dimension()
+                if d > 0 and d <= dimbound:
+                    S.WriteDecompositionToFile(filename, mode);
+                    mode = "a"
 
 def WritePrimes(bound = 200, filename = "../data/primes.in"):
     with open(filename, "w") as f:

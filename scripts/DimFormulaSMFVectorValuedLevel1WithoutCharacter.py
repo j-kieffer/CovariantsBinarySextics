@@ -71,9 +71,6 @@ def dimension_cusp_forms_SP4Z(J, k):
     res += - ((sigma**7)**k * (sigma**8)**j * QQ(2)**(-3) * QQ(3)**(-2) * (sigma+sigma**3)).trace()
     return ZZ(res)
 
-    
-
-
 
 
 def dim_splitting_VV_All_weight(k,j):
@@ -82,21 +79,21 @@ def dim_splitting_VV_All_weight(k,j):
     """
     k = ZZ(k)
     j = ZZ(j)
-    
+
     if (j % 2) == 1 or k == 0 or k == 1:
         return {
-                      'degree': 2, 
-                      'family': 'S', 
-                      'level': 1, 
-                      'weight': [k, j], 
-                      'char_orbit' : 0, 
-                      'total_dim': 0, 
+                      'degree': 2,
+                      'family': 'S',
+                      'level': 1,
+                      'weight': [k, j],
+                      'char_orbit' : 0,
+                      'total_dim': 0,
                       'cusp_dim': 0,
                       'eis_dim': 0,
                       'eis_F_dim': 0,
                       'eis_Q_dim': 0,
-                      'cusp_P_dim': 0, 
-                      'cusp_Y_dim': 0, 
+                      'cusp_P_dim': 0,
+                      'cusp_Y_dim': 0,
                       'cusp_G_dim': 0}
 
 
@@ -106,55 +103,50 @@ def dim_splitting_VV_All_weight(k,j):
         if j > 53:
                   raise ValueError("we do not know")
         return {
-                'degree': 2, 
-                'family': 'S', 
-                'level': 1, 
-                'weight': [2, j], 
-                'char_orbit' : 0, 
-                'total_dim': 0, 
-                'cusp_dim': 0, 
-                'eis_dim': 0, 
-                'eis_F_dim': 0,
-                'eis_Q_dim': 0,
-                'cusp_P_dim': 0, 
-                'cusp_Y_dim': 0, 
-                'cusp_G_dim': 0}
-
-    elif k == 3 and (j % 2) == 0:  
-        return {
-                'degree': 2, 
-                'family': 'S', 
-                'level': 1, 
-                'weight': [3, j], 
-                'char_orbit' : 0, 
-                'total_dim': dim_VV_sp4Z_j_3_without_charac(j), 
-                'cusp_dim': dim_VV_sp4Z_j_3_without_charac(j), 
-                'eis_dim': 0, 
+                'degree': 2,
+                'family': 'S',
+                'level': 1,
+                'weight': [2, j],
+                'char_orbit' : 0,
+                'total_dim': 0,
+                'cusp_dim': 0,
+                'eis_dim': 0,
                 'eis_F_dim': 0,
                 'eis_Q_dim': 0,
                 'cusp_P_dim': 0,
-                'cusp_Y_dim': 0, 
+                'cusp_Y_dim': 0,
+                'cusp_G_dim': 0}
+
+    elif k == 3 and (j % 2) == 0:
+        return {
+                'degree': 2,
+                'family': 'S',
+                'level': 1,
+                'weight': [3, j],
+                'char_orbit' : 0,
+                'total_dim': dim_VV_sp4Z_j_3_without_charac(j),
+                'cusp_dim': dim_VV_sp4Z_j_3_without_charac(j),
+                'eis_dim': 0,
+                'eis_F_dim': 0,
+                'eis_Q_dim': 0,
+                'cusp_P_dim': 0,
+                'cusp_Y_dim': 0,
                 'cusp_G_dim': dim_VV_sp4Z_j_3_without_charac(j)}
 
     elif k > 3 :
         return {
-'degree': 2, 
-'family': 'S', 
-'level': 1, 
-'weight': [k, j], 
-'char_orbit' : 0, 
-'total_dim': dimension_cusp_forms_SP4Z(j,k) + CuspForms(SL2Z,k+j).dimension(), 
-'cusp_dim': dimension_cusp_forms_SP4Z(j,k), 
-'eis_dim': CuspForms(SL2Z,k+j).dimension(), 
+'degree': 2,
+'family': 'S',
+'level': 1,
+'weight': [k, j],
+'char_orbit' : 0,
+'total_dim': dimension_cusp_forms_SP4Z(j,k) + CuspForms(SL2Z,k+j).dimension(),
+'cusp_dim': dimension_cusp_forms_SP4Z(j,k),
+'eis_dim': CuspForms(SL2Z,k+j).dimension(),
 'eis_F_dim': 0,
 'eis_Q_dim': CuspForms(SL2Z,k+j).dimension(),
 'cusp_P_dim': 0,
-'cusp_Y_dim': 0, 
+'cusp_Y_dim': 0,
 'cusp_G_dim': dimension_cusp_forms_SP4Z(j,k)
 }
 
-
-
-
-        
-  
