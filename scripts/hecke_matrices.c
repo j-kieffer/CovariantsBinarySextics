@@ -45,19 +45,26 @@ parse_covariants(fmpz_mpoly_vec_t pols, slong nb_spaces, const slong* dims,
 
     for (k = 0; k < nb_spaces; k++)
     {
+        str = NULL;
+        nb = 0;
+        getline(&str, &nb, file_in);
+        flint_free(str); /* Text description */
+        str = NULL;
+        getline(&str, &nb, file_in);
+        flint_free(str); /* Character */
+
         for (j = 0; j < dims[k]; j++)
         {
             str = NULL;
-            nb = 0;
             getline(&str, &nb, file_in);
             str[strcspn(str, "\n")] = 0; /* remove final newline */
             fmpz_mpoly_set_str_pretty(fmpz_mpoly_vec_entry(pols, pols_indices[k] + j),
                 str, (const char**) vars, ctx);
             flint_free(str);
-            /* flint_printf("(parse_covariants) k = %wd, j = %wd, poly:\n", k, j);
-               fmpz_mpoly_print_pretty(fmpz_mpoly_vec_entry(pols, pols_indices[k] + j),
+            flint_printf("(parse_covariants) k = %wd, j = %wd, poly:\n", k, j);
+            fmpz_mpoly_print_pretty(fmpz_mpoly_vec_entry(pols, pols_indices[k] + j),
                 (const char**) vars, ctx);
-                flint_printf("\n");*/
+            flint_printf("\n");
         }
 
         if (!feof(file_in))
@@ -248,8 +255,8 @@ int fmpq_mat_fprint_pretty(FILE * file, const fmpq_mat_t mat)
 
 /* Add term corresponding to k^th coset to all matrices */
 static void
-hecke_add_term(acb_mat_struct* hecke, slong nb_spaces,
-    const slong* dims, slong* pols_indices, const acb_mat_struct* taus,
+hecke_add_term(acb_mat_struct* hecke, slong nb_spaces, const slong* dims,
+    const int* characters, const slong* pols_indices, const acb_mat_struct* taus,
     slong max_dim, slong k, slong p,
     int is_T1, const hecke_mpoly_ctx_t ctx, slong prec)
 {
@@ -259,7 +266,7 @@ hecke_add_term(acb_mat_struct* hecke, slong nb_spaces,
     acb_ptr basic;
     acb_ptr res;
     slong nb = pols_indices[nb_spaces];
-    acb_t v;
+    acb_t chi5;
     slong i, j, l;
 
     fmpz_mat_init(mat, 4, 4);
@@ -267,7 +274,7 @@ hecke_add_term(acb_mat_struct* hecke, slong nb_spaces,
     acb_mat_init(c, 2, 2);
     acb_mat_init(cinv, 2, 2);
     acb_poly_init(r);
-    acb_init(v);
+    acb_init(chi5);
     basic = _acb_vec_init(ACB_THETA_G2_COV_NB);
     res = _acb_vec_init(nb);
 
@@ -275,20 +282,26 @@ hecke_add_term(acb_mat_struct* hecke, slong nb_spaces,
     for (j = 0; j < max_dim; j++)
     {
         acb_siegel_transform_cocycle_inv(w, c, cinv, mat, &taus[j], prec);
-        acb_theta_g2_sextic(r, w, prec);
+        acb_theta_g2_sextic_chi5(r, chi5, w, prec);
         acb_theta_g2_detk_symj(r, cinv, r, -2, 6, prec);
         acb_theta_g2_covariants_lead(basic, r, prec);
         hecke_mpoly_eval(res, basic, ctx, prec);
 
         for (i = 0; i < nb_spaces; i++)
         {
-            if (j < dims[i])
+            if (j >= dims[i])
             {
-                for (l = 0; l < dims[i]; l++)
-                {
-                    acb_add(acb_mat_entry(&hecke[i], l, j),
-                        acb_mat_entry(&hecke[i], l, j), &res[pols_indices[i] + l], prec);
-                }
+                continue;
+            }
+            if (characters[i])
+            {
+                _acb_vec_scalar_mul(res + pols_indices[i], res + pols_indices[i],
+                    dims[i], chi5, prec);
+            }
+            for (l = 0; l < dims[i]; l++)
+            {
+                acb_add(acb_mat_entry(&hecke[i], l, j),
+                    acb_mat_entry(&hecke[i], l, j), &res[pols_indices[i] + l], prec);
             }
         }
     }
@@ -298,53 +311,62 @@ hecke_add_term(acb_mat_struct* hecke, slong nb_spaces,
     acb_mat_clear(c);
     acb_mat_clear(cinv);
     acb_poly_clear(r);
-    acb_clear(v);
+    acb_clear(chi5);
     _acb_vec_clear(basic, ACB_THETA_G2_COV_NB);
     _acb_vec_clear(res, nb);
 }
 
 static void
-hecke_source(acb_mat_struct* source, slong nb_spaces,
-    const slong* dims, const slong* pols_indices, const acb_mat_struct* taus,
+hecke_source(acb_mat_struct* source, slong nb_spaces, const slong* dims,
+    const int* characters, const slong* pols_indices, const acb_mat_struct* taus,
     slong max_dim, const hecke_mpoly_ctx_t ctx, slong prec)
 {
     acb_poly_t r;
     acb_ptr basic;
     acb_ptr res;
+    acb_t chi5;
     slong i, j, l;
     slong nb = pols_indices[nb_spaces];
 
     acb_poly_init(r);
+    acb_init(chi5);
     basic = _acb_vec_init(ACB_THETA_G2_COV_NB);
     res = _acb_vec_init(nb);
 
     for (j = 0; j < max_dim; j++)
     {
-        acb_theta_g2_sextic(r, &taus[j], prec);
+        acb_theta_g2_sextic_chi5(r, chi5, &taus[j], prec);
         acb_theta_g2_covariants_lead(basic, r, prec);
         hecke_mpoly_eval(res, basic, ctx, prec);
 
         for (i = 0; i < nb_spaces; i++)
         {
-            if (j < dims[i])
+            if (j >= dims[i])
             {
-                for (l = 0; l < dims[i]; l++)
-                {
-                    acb_set(acb_mat_entry(&source[i], l, j), &res[pols_indices[i] + l]);
-                }
+                continue;
+            }
+            if (characters[i])
+            {
+                _acb_vec_scalar_mul(res + pols_indices[i], res + pols_indices[i],
+                    dims[i], chi5, prec);
+            }
+            for (l = 0; l < dims[i]; l++)
+            {
+                acb_set(acb_mat_entry(&source[i], l, j), &res[pols_indices[i] + l]);
             }
         }
     }
 
     acb_poly_clear(r);
+    acb_clear(chi5);
     _acb_vec_clear(basic, ACB_THETA_G2_COV_NB);
     _acb_vec_clear(res, nb);
 }
 
 
 static int
-hecke_attempt(fmpq_mat_struct* mats, slong nb_spaces,
-    slong* dims, slong* pols_indices, slong max_dim, slong p, int is_T1,
+hecke_attempt(fmpq_mat_struct* mats, slong nb_spaces, const slong* dims,
+    const int* characters, const slong* pols_indices, slong max_dim, slong p, int is_T1,
     const hecke_mpoly_ctx_t ctx, slong prec)
 {
     acb_mat_struct* tau;
@@ -375,7 +397,7 @@ hecke_attempt(fmpq_mat_struct* mats, slong nb_spaces,
     hecke_generate_base_points(tau, max_dim, prec);
 
     flint_printf("(hecke_attempt) evaluating covariants at base points...\n");
-    hecke_source(source, nb_spaces, dims, pols_indices, tau, max_dim, ctx, prec);
+    hecke_source(source, nb_spaces, dims, characters, pols_indices, tau, max_dim, ctx, prec);
     for (k = 0; (k < nb_spaces) && res; k++)
     {
         res = acb_mat_inv(&source[k], &source[k], prec);
@@ -388,7 +410,7 @@ hecke_attempt(fmpq_mat_struct* mats, slong nb_spaces,
         {
             flint_printf("%wd/%wd\n", k, nb);
         }
-        hecke_add_term(hecke, nb_spaces, dims, pols_indices, tau, max_dim,
+        hecke_add_term(hecke, nb_spaces, dims, characters, pols_indices, tau, max_dim,
             k, p, is_T1, ctx, prec);
     }
 
@@ -454,6 +476,7 @@ int main(int argc, const char *argv[])
     slong q, nb_spaces, p, max_dim;
     int is_T1;
     slong* dims = NULL;
+    int* characters = NULL;
     slong prec;
     fmpz_mpoly_vec_t pols;
     slong* pols_indices;
@@ -473,7 +496,7 @@ int main(int argc, const char *argv[])
     flint_printf("(hecke) Call with q = %s, input: %s, output: %s\n", argv[1], argv[2], argv[3]);
 
     q = strtol(argv[1], NULL, 10);
-    parse_integers(&nb_spaces, &dims, argv[2]);
+    parse_integers(&nb_spaces, &dims, &characters, argv[2]);
     if (nb_spaces == 0)
     {
         flint_printf("Error: empty input\n");
@@ -507,7 +530,7 @@ int main(int argc, const char *argv[])
     prec = 500;
     while (!done)
     {
-        done = hecke_attempt(mats, nb_spaces, dims, pols_indices,
+        done = hecke_attempt(mats, nb_spaces, dims, characters, pols_indices,
             max_dim, p, is_T1, hecke_ctx, prec);
         prec *= 2;
     }
@@ -533,6 +556,7 @@ int main(int argc, const char *argv[])
     }
     flint_free(mats);
     flint_free(dims);
+    flint_free(characters);
     fmpz_mpoly_ctx_clear(ctx);
     hecke_mpoly_ctx_clear(hecke_ctx);
 

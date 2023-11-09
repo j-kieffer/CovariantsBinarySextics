@@ -577,7 +577,7 @@ hecke_generate_base_points(acb_mat_struct* tau, slong max_dim, slong prec)
 /* ---------- Read input ---------- */
 
 static void
-parse_integers(slong* nb_spaces, slong** dims, const char* filename_in)
+parse_integers(slong* nb_spaces, slong** dims, int** characters, const char* filename_in)
 {
     FILE* file_in;
     char* str;
@@ -602,15 +602,25 @@ parse_integers(slong* nb_spaces, slong** dims, const char* filename_in)
         getline(&str, &nb, file_in);
         str[strcspn(str, "\n")] = 0; /* remove final newline */
         nb = strcspn(str, "");
-        /* flint_printf("(parse_integers) read line with nb = %wd, nb_prev = %wd\n", nb, nb_prev);
-           flint_printf("line: %s\n", str); */
+        flint_printf("(parse_integers) read line with nb = %wd, nb_prev = %wd\n", nb, nb_prev);
+        flint_printf("line: %s\n", str);
         flint_free(str);
 
         if (nb > 0 && nb_prev == 0)
         {
+            /* start new space */
             (*nb_spaces)++;
             *dims = flint_realloc(*dims, (*nb_spaces + 1) * sizeof(slong));
-            dim = 1;
+            *characters = flint_realloc(*characters, (*nb_spaces + 1) * sizeof(int));
+            str = NULL;
+            getline(&str, &nb, file_in);
+            str[strcspn(str, "\n")] = 0; /* remove final newline */
+            nb = strcspn(str, "");
+            flint_printf("(parse_integers) read line with nb = %wd, nb_prev = %wd\n", nb, nb_prev);
+            flint_printf("line: %s\n", str);
+            *characters[*nb_spaces - 1] = strtol(str, NULL, 10);
+            flint_free(str);
+            dim = 0;
         }
         else if (nb > 0)
         {
