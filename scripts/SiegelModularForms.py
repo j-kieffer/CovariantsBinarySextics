@@ -12,6 +12,8 @@ from sage.sets.set import Set
 from BinarySexticsCovariants import BinarySexticsCovariants as BSC
 from DimFormulaSMFScalarValuedLevel1WithoutCharacter import dim_splitting_SV_All_weight
 from DimFormulaSMFVectorValuedLevel1WithoutCharacter import dim_splitting_VV_All_weight
+from DimFormulaSMFScalarValuedLevel1WithCharacter import dim_splitting_SV_All_weight_charac
+from DimFormulaSMFVectorValuedLevel1WithCharacter import dim_splitting_VV_All_weight_charac
 from FJexp import VectorFJexp, FJexp
 from ThetaFourier import Chi
 from Generators_Ring_Covariants_Sextic import RingOfCovariants
@@ -37,7 +39,7 @@ class SMF(SageObject):
     chi = 0
     t_chi = 0
 
-    def __init__(self, k, j):
+    def __init__(self, k, j, character = False):
         self.k = k
         self.j = j
         self.prec = 3
@@ -45,27 +47,33 @@ class SMF(SageObject):
         self.basis = None
         self.decomposition = None
         self.fields = None
-        #if j == 0:
-        #    B = SMFPrecomputedScalarBasis(k)
-        #    if not B is None:
-        #        self.SetBasis(B)
+        self.character = character
 
     def __str__(self):
-        return "Space of Siegel modular form of weight ("+str(self.k)+"," + str(self.j) + ")"
+        s = "Space of Siegel modular form of weight ("+str(self.k)+"," + str(self.j) + ")"
+        if self.character:
+            s += " with character"
+        return s
 
     def __repr__(self):
         return str(self)
-    
+
     def SetBasis(self, L):
         CRing = RingOfCovariants()
         self.basis = [CRing(x) for x in L]
 
     def Dimension(self):
-        if (self.dim is None):
-            if (self.j == 0):
-                self.dim = dim_splitting_SV_All_weight(self.k)['total_dim']
-            else:
-                self.dim = dim_splitting_VV_All_weight(self.k, self.j)['total_dim']
+        if not self.dim is None:
+            return self.dim
+
+        if self.j == 0 and self.character:
+            self.dim = dim_splitting_SV_All_weight_with_charac(self.k)['total_dim']
+        elif self.j == 0:
+            self.dim = dim_splitting_SV_All_weight(self.k)['total_dim']
+        elif self.character:
+            self.dim = dim_splitting_VV_All_weight_with_charac(self.k, self.j)['total_dim']
+        else:
+            self.dim = dim_splitting_VV_All_weight(self.k, self.j)['total_dim']
         return self.dim
 
     def _subs_chi(basis, chi, t_chi, s_prec):
@@ -124,7 +132,7 @@ class SMF(SageObject):
         all_coeffs = [a + [0 for j in range(max_len-len(a))] for a in all_coeffs]
         mat_coeffs = Matrix(all_coeffs)
         return mat_coeffs
-    
+
     def _solve_linear_system(V, b_comps_exp, b_exps, up_to_val=0):
         ker = V
         qexps = reduce(lambda x,y: x.union(y),
@@ -182,37 +190,40 @@ class SMF(SageObject):
 
                 #Linear algebra
                 print("Solving linear system...")
-                ker = SMF._solve_linear_system(V, b_comps_exp, b_exps, up_to_val=-2*pole_ord)
+                ker = SMF._solve_linear_system(V, b_comps_exp, b_exps, up_to_val= -pole_ord)
                 print("Done!")
-        
+
         # Take only highest valuations
         basis = [sum([b.denominator()*b[i]*basis[i] for i in range(len(basis))]) for b in ker.basis()]
         return basis, prec, s_prec
-    
+
     def GetBasis(self, prec=3, taylor_prec=20):
         if (not self.basis is None and prec <= self.prec):
             return self.basis
 
         k = self.k
         j = self.j
-
-        a_max = k + j//2
-        a_min = a_max % 10
-        pole_ord = a_max // 10
-
         chi10 = SMF._GetBasisWithPoles(BSC(10,0), prec, taylor_prec, -1, 1)[0][0]
-
         self.basis = []
         dim = self.Dimension()
-        
+
+        a_max = k + j//2
+        if (self.character):
+            a_max -= 5
+
+        a_min = a_max % 10
+        pole_ord = 2 * (a_max // 10)
+        if (self.character):
+            pole_ord += 1
+
         a = a_min
         while (len(self.basis) < dim):
             bsc = BSC(a, j)
             self.basis, self.prec, self.s_prec = SMF._GetBasisWithPoles(bsc, prec, taylor_prec, pole_ord, dim)
-            self.basis = [(chi10)**pole_ord * b for b in self.basis]
+            self.basis = [(chi10)**(pole_ord / 2) * b for b in self.basis]
             a += 10
-            pole_ord -= 1
-        
+            pole_ord -= 2
+
         return self.basis
 
     def WriteBasisToFile(self, filename, mode):
@@ -247,7 +258,9 @@ class SMF(SageObject):
     # This computes the Hecke action on full basis
     def HeckeAction(self, q, filename="../data/temp", log=True):
         self.WriteBasisToFile(filename + ".in", "w")
-        call = ["./hecke.exe", "{}".format(q), filename + ".in", filename + ".out"]
+        call = ["./hecke_matrices.exe", "{}".format(q), filename + ".in", filename + ".out"]
+        if self.character:
+            call[1] = "./hecke_matrices_with_character.exe"
         run = subprocess.run(call, capture_output=True, check=True)
         subprocess.run(["rm", filename + ".in"])
         if log:
@@ -330,7 +343,9 @@ class SMF(SageObject):
 
     def HeckeActionOnEigenvectors(self, q, filename="../data/temp", log=True):
         self.WriteDecompositionToFile(filename + ".in", "w")
-        call = ["./hecke.exe", "{}".format(q), filename + ".in", filename + ".out"]
+        call = ["./hecke_eigenvalues.exe", "{}".format(q), filename + ".in", filename + ".out"]
+        if self.character:
+            call[1] = "./hecke_eigenvalues_with_character.exe"
         run = subprocess.run(call, capture_output=True, check=True)
         subprocess.run(["rm", filename + ".in"])
         if log:
