@@ -67,11 +67,11 @@ class SMF(SageObject):
             return self.dim
 
         if self.j == 0 and self.character:
-            self.dim = dim_splitting_SV_All_weight_with_charac(self.k)['total_dim']
+            self.dim = dim_splitting_SV_All_weight_charac(self.k)['total_dim']
         elif self.j == 0:
             self.dim = dim_splitting_SV_All_weight(self.k)['total_dim']
         elif self.character:
-            self.dim = dim_splitting_VV_All_weight_with_charac(self.k, self.j)['total_dim']
+            self.dim = dim_splitting_VV_All_weight_charac(self.k, self.j)['total_dim']
         else:
             self.dim = dim_splitting_VV_All_weight(self.k, self.j)['total_dim']
         return self.dim
@@ -220,7 +220,7 @@ class SMF(SageObject):
         while (len(self.basis) < dim):
             bsc = BSC(a, j)
             self.basis, self.prec, self.s_prec = SMF._GetBasisWithPoles(bsc, prec, taylor_prec, pole_ord, dim)
-            self.basis = [(chi10)**(pole_ord / 2) * b for b in self.basis]
+            self.basis = [(chi10)**(pole_ord // 2) * b for b in self.basis]
             a += 10
             pole_ord -= 2
 
