@@ -1,12 +1,11 @@
-/* Compilation:
-gcc -I/home/jean/install/include/flint -I/home/jean/install/include hecke_matrices.c -L/home/jean/install/lib -lflint -lgmp -o hecke_matrices.exe
-
-Usage:
+/* Usage:
 ./hecke_matrices.exe q filename_in filename_out
 
-Each line in filename_in is a covariant encoded as a multivariate polynomial in
-Co16, etc. with integral coefficients. Consecutive lines are elements in the
-basis of one space. Bases for different spaces are separated by a newline.
+Each block of lines in filename_in encodes a space of modular forms. Different
+spaces should be separated by one newline. Each space consists of following
+line: (1) Text description, (2) 1 or 0 depending on whether the space has
+character or not, (3) one line per covariant as a multivariate polynomial in
+Co16, etc. with integral coefficients.
 
 A list of matrices is printed to filename_out. Each one encodes the Hecke
 action (T(p) if q=p is prime, T_1(p^2) if q=p^2) on the input space as a matrix

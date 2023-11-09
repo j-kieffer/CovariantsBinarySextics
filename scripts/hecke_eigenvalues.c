@@ -1,26 +1,26 @@
-/* Compilation:
-gcc -I/home/jean/install/include/flint -I/home/jean/install/include hecke_eigenvalues.c -L/home/jean/install/lib -lflint -lgmp -lm -o hecke_eigenvalues.exe
-
-Usage:
+/* Usage:
 ./hecke_eigenvalues.exe q filename_in filename_out
 
 Each block of lines in filename_in encodes a Hecke eigenform defined over a
-number field. Blocks are separated by a newline. The first line of each block
-is a polynomial in x defining the number field (of degree d say). The next d
-lines are the coefficients of the Hecke eigenform in the basis 1,...,x^(d-1),
-encoded as multivariate polynomials in Co16, etc. with integral coefficients.
+number field. Blocks are separated by one newline. Each block consists of the
+following lines: (1) Text description, (2) 1 or 0 depending on whether the
+space has character or not, (3) a polynomial in x defining the number field (of
+degree d say), (4) and finally the next d lines are the coefficients of the
+Hecke eigenform in the basis 1,...,x^(d-1), encoded as multivariate polynomials
+in Co16, etc. with integral coefficients.
 
 A list of eigenvalues is printed to filename_out. Each eigenvalue is an integer
 y in the associated number field, and is represented as the list of integers
 Tr(y), Tr(xy), ..., Tr(x^(d-1) y). The result is always certified assuming that
-the input is indeed an eigenform.
+the input is indeed an eigenform. (We also print the text description,
+character, and number field, so that the line numberings of the input and
+output files correspond to each other.)
 
 parallel run: in tmux, (increase j and number of primes for larger computation)
 
 time parallel -j1 --joblog data/log/joblog.txt --results data/log --eta scripts/hecke_eigenvalues.exe {1} data/all.in data/{1}.dat :::: data/primes_20.in > data/log/stdout.txt
 
-then ctrl+b then d to detach, can close terminal, and finally tmux attach.
-*/
+then ctrl+b then d to detach, can close terminal, and finally tmux attach. */
 
 #include "fmpz_poly.h"
 #include "arb_fmpz_poly.h"
