@@ -602,8 +602,6 @@ parse_integers(slong* nb_spaces, slong** dims, int** characters, const char* fil
         getline(&str, &nb, file_in);
         str[strcspn(str, "\n")] = 0; /* remove final newline */
         nb = strcspn(str, "");
-        flint_printf("(parse_integers) read line with nb = %wd, nb_prev = %wd\n", nb, nb_prev);
-        flint_printf("line: %s\n", str);
         flint_free(str);
 
         if (nb > 0 && nb_prev == 0)
@@ -612,15 +610,15 @@ parse_integers(slong* nb_spaces, slong** dims, int** characters, const char* fil
             (*nb_spaces)++;
             *dims = flint_realloc(*dims, (*nb_spaces + 1) * sizeof(slong));
             *characters = flint_realloc(*characters, (*nb_spaces + 1) * sizeof(int));
+            dim = 0;
+
+            /* get character */
             str = NULL;
             getline(&str, &nb, file_in);
             str[strcspn(str, "\n")] = 0; /* remove final newline */
             nb = strcspn(str, "");
-            flint_printf("(parse_integers) read line with nb = %wd, nb_prev = %wd\n", nb, nb_prev);
-            flint_printf("line: %s\n", str);
-            *characters[*nb_spaces - 1] = strtol(str, NULL, 10);
+            (*characters)[*nb_spaces - 1] = (int) strtol(str, NULL, 10);
             flint_free(str);
-            dim = 0;
         }
         else if (nb > 0)
         {

@@ -38,7 +38,7 @@ parse_covariants(fmpz_mpoly_vec_t pols, fmpz_poly_struct* fields, slong nb_space
     char** vars;
     char* varx[] = {"x"};
     char* str;
-    size_t nb;
+    size_t nb = 0;
     FILE* file_in;
     slong inds[ACB_THETA_G2_COV_NB] = {16, 20, 24, 28, 32, 36, 38, 312, 40, 44, 46, 410, 52, 54, 58, 60, 661, 662, 72, 74, 82, 94, 100, 102, 122, 150};
     slong k, j;
@@ -61,9 +61,15 @@ parse_covariants(fmpz_mpoly_vec_t pols, fmpz_poly_struct* fields, slong nb_space
 
     for (k = 0; k < nb_spaces; k++)
     {
+        str = NULL;
+        getline(&str, &nb, file_in);
+        flint_free(str); /* Text description */
+        str = NULL;
+        getline(&str, &nb, file_in);
+        flint_free(str); /* Character */
+
         /* Get univariate polynomial */
         str = NULL;
-        nb = 0;
         getline(&str, &nb, file_in);
         str[strcspn(str, "\n")] = 0; /* remove final newline */
         fmpz_mpoly_set_str_pretty(univ, str, (const char**) varx, univ_ctx);
@@ -77,7 +83,6 @@ parse_covariants(fmpz_mpoly_vec_t pols, fmpz_poly_struct* fields, slong nb_space
         for (j = 0; j < dims[k]; j++)
         {
             str = NULL;
-            nb = 0;
             getline(&str, &nb, file_in);
             str[strcspn(str, "\n")] = 0; /* remove final newline */
             fmpz_mpoly_set_str_pretty(fmpz_mpoly_vec_entry(pols, pols_indices[k] + j),
@@ -92,7 +97,6 @@ parse_covariants(fmpz_mpoly_vec_t pols, fmpz_poly_struct* fields, slong nb_space
         if (!feof(file_in))
         {
             str = NULL;
-            nb = 0;
             getline(&str, &nb, file_in);
             str[strcspn(str, "\n")] = 0; /* remove final newline */
             nb = strcspn(str, "");
@@ -442,6 +446,7 @@ int main(int argc, const char *argv[])
     flint_free(pols_indices);
     flint_free(fields);
     flint_free(dims);
+    flint_free(characters);
     fmpz_mpoly_ctx_clear(ctx);
     hecke_mpoly_ctx_clear(hecke_ctx);
 
