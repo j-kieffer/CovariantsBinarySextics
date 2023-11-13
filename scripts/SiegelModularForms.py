@@ -6,6 +6,7 @@ from sage.rings.big_oh import O
 from sage.rings.infinity import infinity
 from sage.rings.rational_field import QQ
 from sage.rings.integer_ring import ZZ
+from sage.rings.polynomial.polynomial_ring_constructor import PolynomialRing
 from sage.all import NumberField, pari
 from sage.sets.set import Set
 
@@ -304,7 +305,7 @@ class SMF(SageObject):
     def HeckeDecomposition(self):
         if not self.decomposition is None:
             return self.decomposition
-        M = self.HeckeAction(2)
+        M = self.HeckeAction(3)
         #print("Matrix of Hecke action at 2:\n{}".format(M))
         fac = M.characteristic_polynomial().factor()
         res = []
@@ -312,15 +313,24 @@ class SMF(SageObject):
         roots = []
         for k in range(len(fac)):
             pol = fac[k][0]
-            #print("Found eigenvalue with minimal polynomial {}".format(pol))
+            print("Found eigenvalue with minimal polynomial {}".format(pol))
             if pol.degree() == 1:
                 F = QQ
                 root = pol.roots()[0][0]
             else:
                 R = pol.parent()
-                newpol = R(pari.polredabs(pol))
+                oldpol = pol
+                newpol = R(pari.polredbest(pol))
+                while (newpol != oldpol):
+                    oldpol = newpol
+                    newpol = R(pari.polredbest(newpol))
+                    print("After one more polredbest:")
+                    print(newpol)
+                #newpol = R(pari.polredabs(newpol))
+                Ry = PolynomialRing(QQ, "y")
                 F = NumberField(newpol, "a")
-                root = F(pari.nfroots(F, pol)[0])
+                print("Number field constructed")
+                root = F(pari.nfroots(Ry(newpol), pol)[0])
             print("Hecke decomposition: found factor and number field")
             print(pol)
             print(F)
@@ -414,7 +424,8 @@ def SMFPrecomputedScalarBasis(k):
     else:
         return None
 
-def WriteAllSpaces(kbound = 50, jbound = 16, dimbound = 6, filename = "../data/all.in"):
+#polredabs is running into problems when k is too large...
+def WriteAllSpaces(kbound = 20, jbound = 16, dimbound = 6, filename = "../data/all.in"):
     mode = "w"
     for j in range(0, jbound + 1, 2):
         for k in range(kbound + 1):
@@ -425,6 +436,8 @@ def WriteAllSpaces(kbound = 50, jbound = 16, dimbound = 6, filename = "../data/a
                 S = SMF(k, j, character = char)
                 d = S.Dimension()
                 if d > 0 and d <= dimbound:
+                    S.GetBasis()
+                    print("Basis done")
                     S.WriteDecompositionToFile(filename, mode);
                     mode = "a"
 

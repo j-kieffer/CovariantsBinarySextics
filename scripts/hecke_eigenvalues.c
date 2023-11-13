@@ -133,8 +133,8 @@ hecke_add_term(acb_ptr hecke, slong nb_spaces, const slong* dims, const int* cha
     acb_poly_t r;
     acb_ptr basic;
     acb_ptr res;
-    acb_t chi5;
-    slong i;
+    acb_t chi5, det;
+    slong i, s;
 
     fmpz_mat_init(mat, 4, 4);
     acb_mat_init(w, 2, 2);
@@ -142,13 +142,25 @@ hecke_add_term(acb_ptr hecke, slong nb_spaces, const slong* dims, const int* cha
     acb_mat_init(cinv, 2, 2);
     acb_poly_init(r);
     acb_init(chi5);
+    acb_init(det);
     basic = _acb_vec_init(ACB_THETA_G2_COV_NB);
     res = _acb_vec_init(len);
 
-    (is_T1 ? hecke_T1_coset(mat, k, p) : hecke_coset(mat, k, p));
+    if (is_T1)
+    {
+        s = hecke_T1_coset(mat, k, p);
+    }
+    else
+    {
+        s = hecke_coset(mat, k, p);
+    }
+
     acb_siegel_transform_cocycle_inv(w, c, cinv, mat, tau, prec);
     acb_theta_g2_sextic_chi5(r, chi5, w, prec);
     acb_theta_g2_detk_symj(r, cinv, r, -2, 6, prec);
+    acb_mat_det(det, cinv, prec);
+    acb_pow_ui(det, det, 5, prec);
+    acb_mul(chi5, chi5, det, prec);
     acb_theta_g2_covariants_lead(basic, r, prec);
     hecke_mpoly_eval(res, basic, ctx, prec);
 
@@ -156,6 +168,10 @@ hecke_add_term(acb_ptr hecke, slong nb_spaces, const slong* dims, const int* cha
     {
         if (characters[i])
         {
+            if (s == 1)
+            {
+                _acb_vec_neg(res + pols_indices[i], res + pols_indices[i], dims[i]);
+            }
             _acb_vec_scalar_mul(res + pols_indices[i], res + pols_indices[i],
                 dims[i], chi5, prec);
         }
@@ -168,6 +184,7 @@ hecke_add_term(acb_ptr hecke, slong nb_spaces, const slong* dims, const int* cha
     acb_mat_clear(cinv);
     acb_poly_clear(r);
     acb_clear(chi5);
+    acb_clear(det);
     _acb_vec_clear(basic, ACB_THETA_G2_COV_NB);
     _acb_vec_clear(res, len);
 }
@@ -318,6 +335,10 @@ hecke_attempt(fmpz* eigenvalues, const fmpz_poly_t fields, slong nb_spaces,
     {
         k0 = ctx->ks[pols_indices[k]];
         j0 = ctx->js[pols_indices[k]];
+        if (characters[k])
+        {
+            k0 += 5;
+        }
         hecke_rescale(f, k0, j0, p, is_T1, prec);
         _acb_vec_scalar_mul(hecke + pols_indices[k], hecke + pols_indices[k],
             dims[k], f, prec);
@@ -366,7 +387,8 @@ int main(int argc, const char *argv[])
     fmpz_mpoly_ctx_t ctx;
     hecke_mpoly_ctx_t hecke_ctx;
     FILE* file_out;
-    slong k, j;
+    slong k, j, k0, j0;
+    double clog;
     int done = 0;
 
     if (argc != 4)
@@ -409,7 +431,8 @@ int main(int argc, const char *argv[])
     hecke_mpoly_ctx_init(hecke_ctx, pols, pols_indices[nb_spaces], ctx);
     flint_printf("done\n");
 
-    prec = 160 + 10 * ceil(10 * log((double) q));
+    clog = ceil(10 * log((double) q));
+    prec = 160 + 15 * clog;
 
     while (!done)
     {
@@ -426,6 +449,22 @@ int main(int argc, const char *argv[])
     }
     for (k = 0; k < nb_spaces; k++)
     {
+        k0 = hecke_ctx->ks[pols_indices[k]];
+        j0 = hecke_ctx->js[pols_indices[k]];
+        if (characters[k])
+        {
+            k0 += 5;
+        }
+        flint_fprintf(file_out, "Eigenform of weight (%wd, %wd)", k0, j0);
+        if (characters[k])
+        {
+            flint_fprintf(file_out, " with character\n");
+        }
+        else
+        {
+            flint_fprintf(file_out, " without character\n");
+        }
+        flint_fprintf(file_out, "Total number %wd\n", k);
         fmpz_poly_fprint_pretty(file_out, &fields[k], "x");
         flint_fprintf(file_out, "\n");
         for (j = 0; j < dims[k]; j++)

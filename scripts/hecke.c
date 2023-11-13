@@ -1,11 +1,15 @@
 /* Functions to be included in both hecke_matrix.c and hecke_eigenvalues.c */
 
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include "ulong_extras.h"
 #include "fmpz_vec.h"
 #include "fmpz_mpoly.h"
+#include "arb_mat.h"
+#include "acb_poly.h"
+#include "acb_mat.h"
 #include "acb_theta.h"
-#include "profiler.h"
 
 /* ---------- Weights and cosets ---------- */
 
@@ -86,7 +90,8 @@ static slong hecke_nb_T1(slong p)
     return p + n_pow(p, 2) + n_pow(p, 3) + n_pow(p, 4);
 }
 
-static void
+/* Also return the sign in case of character as 0, 1 mod 2 */
+static slong
 hecke_coset(fmpz_mat_t m, slong k, slong p)
 {
     slong a, b, c;
@@ -112,6 +117,7 @@ hecke_coset(fmpz_mat_t m, slong k, slong p)
         fmpz_set_si(fmpz_mat_entry(m, 0, 3), b);
         fmpz_set_si(fmpz_mat_entry(m, 1, 2), b);
         fmpz_set_si(fmpz_mat_entry(m, 1, 3), c);
+        return (a + b + c) % 2;
     }
     else if (k < 1 + n_pow(p, 3))
     {
@@ -120,6 +126,7 @@ hecke_coset(fmpz_mat_t m, slong k, slong p)
         fmpz_set_si(fmpz_mat_entry(m, 1, 1), p);
         fmpz_set_si(fmpz_mat_entry(m, 2, 2), 1);
         fmpz_set_si(fmpz_mat_entry(m, 3, 3), 1);
+        return 0;
     }
     else if (k < 1 + n_pow(p, 3) + p)
     {
@@ -130,6 +137,7 @@ hecke_coset(fmpz_mat_t m, slong k, slong p)
         fmpz_set_si(fmpz_mat_entry(m, 1, 1), p);
         fmpz_set_si(fmpz_mat_entry(m, 2, 2), p);
         fmpz_set_si(fmpz_mat_entry(m, 3, 3), 1);
+        return (a) % 2;
     }
     else
     {
@@ -143,10 +151,11 @@ hecke_coset(fmpz_mat_t m, slong k, slong p)
         fmpz_set_si(fmpz_mat_entry(m, 2, 2), 1);
         fmpz_set_si(fmpz_mat_entry(m, 2, 3), a);
         fmpz_set_si(fmpz_mat_entry(m, 3, 3), p);
+        return (a + b) % 2;
     }
 }
 
-static void
+static slong
 hecke_T1_coset(fmpz_mat_t m, slong k, slong p)
 {
     slong a, b, c;
@@ -161,6 +170,7 @@ hecke_T1_coset(fmpz_mat_t m, slong k, slong p)
         fmpz_set_si(fmpz_mat_entry(m, 1, 1), n_pow(p, 2));
         fmpz_set_si(fmpz_mat_entry(m, 2, 2), p);
         fmpz_set_si(fmpz_mat_entry(m, 3, 3), 1);
+        return 0;
     }
     else if (k < 1 + (n_pow(p, 2)-1) )
     {
@@ -188,6 +198,7 @@ hecke_T1_coset(fmpz_mat_t m, slong k, slong p)
         fmpz_set_si(fmpz_mat_entry(m, 0, 3), b);
         fmpz_set_si(fmpz_mat_entry(m, 1, 2), b);
         fmpz_set_si(fmpz_mat_entry(m, 1, 3), c);
+        return (a + b + c) % 2;
     }
     else if (k < n_pow(p, 2) + p)
     {
@@ -199,6 +210,7 @@ hecke_T1_coset(fmpz_mat_t m, slong k, slong p)
         fmpz_set_si(fmpz_mat_entry(m, 2, 2), 1);
         fmpz_set_si(fmpz_mat_entry(m, 2, 3), a);
         fmpz_set_si(fmpz_mat_entry(m, 3, 3), p);
+        return a % 2;
     }
     else if (k < n_pow(p, 2) + p + n_pow(p, 3))
     {
@@ -213,6 +225,7 @@ hecke_T1_coset(fmpz_mat_t m, slong k, slong p)
         fmpz_set_si(fmpz_mat_entry(m, 1, 2), -p*b);
         fmpz_set_si(fmpz_mat_entry(m, 2, 2), n_pow(p, 2));
         fmpz_set_si(fmpz_mat_entry(m, 3, 3), p);
+        return (a + b) % 2;
     }
     else
     {
@@ -231,6 +244,7 @@ hecke_T1_coset(fmpz_mat_t m, slong k, slong p)
         fmpz_set_si(fmpz_mat_entry(m, 2, 2), p);
         fmpz_set_si(fmpz_mat_entry(m, 2, 3), a*p);
         fmpz_set_si(fmpz_mat_entry(m, 3, 3), n_pow(p, 2));
+        return (a + b + c) % 2;
     }
 }
 
