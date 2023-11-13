@@ -22,7 +22,7 @@ def exponential(prec):
 
 class FJexp(SageObject):
     r"""
-    This class represents (scalar-valued) Fourier Jacobi expansions of 
+    This class represents (scalar-valued) Fourier Jacobi expansions of
     (not necessarily holomorphic)
     Siegel modular forms as power series in q_1,q_2 over a Laurent ring in s.
     Unlike sage, it keeps track of the precision of the coefficients.
@@ -39,7 +39,7 @@ class FJexp(SageObject):
         else:
             self.min_val = self.exps[0][0] + self.exps[0][1]
         # self.min_val = min([e[0] + e[1] for e in self.exps])
-    
+
     def __init__(self, qexp):
         pow_ser_types = [MPowerSeries]
         if (type(qexp) == FJexp):
@@ -100,7 +100,7 @@ class FJexp(SageObject):
         # For now we don't kill off zeros, to not harm precision
         for e in ret.exps:
             ret.coeffs[e] = self.coeffs.get(e,0) + other.coeffs.get(e,0)
-        
+
         if len(ret.exps) == 0:
             ret.min_val = -infinity
         else:
@@ -114,7 +114,7 @@ class FJexp(SageObject):
             if (((v1 == infinity) and (v2 == -infinity)) or
                 ((v1 == -infinity) and (v2 == infinity))):
                 return -infinity
-            return v1+v2    
+            return v1+v2
         ret = FJexp(self)
         ret.prec = min(val_add(self.min_val,other.prec), val_add(self.prec,other.min_val))
         coeffs = {}
@@ -169,9 +169,9 @@ class FJexp(SageObject):
 
 class VectorFJexp(SageObject):
     r"""
-    This class represents vector-valued Fourier Jacobi expansions of 
+    This class represents vector-valued Fourier Jacobi expansions of
     (not necessarily holomorphic)
-    Siegel modular forms as polynomials in two-variables x, yin 
+    Siegel modular forms as polynomials in two-variables x, yin
     power series in q_1,q_2 over a Laurent ring in s.
     """
 
@@ -180,7 +180,7 @@ class VectorFJexp(SageObject):
         for e in chi.dict().keys():
             self.coeffs[e] = FJexp(chi.dict()[e])
             self.exps = sorted(list(self.coeffs.keys()))
-    
+
     def _init_from_func_field(self, chi, prec):
         assert prec >= 2
         self.coeffs = {}
@@ -188,14 +188,14 @@ class VectorFJexp(SageObject):
         Rs = LaurentSeriesRing(QQ, "s")
         s = Rs.gen()
         Rsq = PowerSeriesRing(Rs, ["q1", "q2"])
-        q1, q2 = Rsq.gens()        
+        q1, q2 = Rsq.gens()
         exp_s = Rs(exponential(prec))
         for e in chi.dict().keys():
             mon = chi.dict()[e]
             mon_exps = list(mon.dict().keys())
             res_mon = FJexp(0)
             for mon_exp in mon_exps:
-                f = mon.dict()[mon_exp]    
+                f = mon.dict()[mon_exp]
                 f_pow = FJexp(f.numerator().subs(exp_s) / f.denominator().subs(exp_s))
                 res_mon += f_pow * FJexp(q1**mon_exp[0] * q2**mon_exp[1])
             self.coeffs[e] = res_mon
@@ -211,7 +211,7 @@ class VectorFJexp(SageObject):
     def _init_from_int(self, a):
         self.exps = [ETuple([0,0])]
         self.coeffs = { ETuple([0,0]) : FJexp(a) }
-        
+
     def __init__(self, chi, prec=0):
         func_field_elt = FunctionFieldElement_rational
         laurent_elt = LaurentSeries
@@ -255,9 +255,9 @@ class VectorFJexp(SageObject):
         ret.exps = sorted([e for e in list(Set(self.exps).union(Set(other.exps)))])
         # For now we don't kill off zeros, to not harm precision
         for e in ret.exps:
-            ret.coeffs[e] = self.coeffs.get(e,0) + other.coeffs.get(e,0)        
+            ret.coeffs[e] = self.coeffs.get(e,0) + other.coeffs.get(e,0)
         return ret
-    
+
     def __mul__(self, other):
         def add_exps(e1, e2):
             return ETuple([e1[j] + e2[j] for j in range(2)])
@@ -290,7 +290,7 @@ class VectorFJexp(SageObject):
         ret.coeffs[ETuple([0,0])] = ret.coeffs.get(ETuple([0,0]), 0) + r
         ret.exps = sorted(ret.coeffs.keys())
         return self
-        
+
     def __neg__(self):
         return (-1)*self
 

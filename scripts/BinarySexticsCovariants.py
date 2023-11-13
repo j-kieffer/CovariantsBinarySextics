@@ -19,22 +19,22 @@ class BinarySexticsCovariants(SageObject):
      Constructs spaces of covariants of binary sextics
 
      EXAMPLES:
-    
+
      This example is Example 2.1 in the overleaf. :
 
         sage: bsc = BinarySexticsCovariants(6,0)
         sage: bsc.GetBasisAndRelationsCov()
         ([Co60, Co20*Co40, Co20^3], [])
-        
+
     """
-    
+
     LW, LCo, LCov, DCov = GetRingGeneratorsCov()
 
     # Verifying the expression for C_{2,0}
     assert LCo[1].parent().variable_names()[1] == 'Co20'
     a = LCov[1].base_ring().gens()
     assert LCov[1] == -3*a[3]**2 + 8*a[2]*a[4] - 20*a[1]*a[5] + 120*a[0]*a[6]
-    
+
     def __init__(self, a, b):
         self.a = a
         self.b = b
@@ -49,7 +49,7 @@ class BinarySexticsCovariants(SageObject):
     def GetCov(cov_name):
         idx = BinarySexticsCovariants.LCo[0].parent().variable_names().index(cov_name)
         return BinarySexticsCovariants.LCov[idx]
-        
+
     def MakeCov(L):
         r"""
         Returns a list with two elements, the first is the polynomial in the covariants defined by the exponents in L, and the second is
@@ -58,7 +58,7 @@ class BinarySexticsCovariants(SageObject):
         INPUT:
 
         - ``L`` - a list of exponents for the different covariants.
-        
+
         OUTPUT: [Cov, polynomial in a_i and x,y]
 
         EXAMPLES:
@@ -71,7 +71,7 @@ class BinarySexticsCovariants(SageObject):
            sage: covs[1]
            [Co20*Co40,
             -9*a3^6 + 72*a2*a3^4*a4...
-        
+
         """
         S = [[BinarySexticsCovariants.LCo[k]**L[k],BinarySexticsCovariants.LCov[k]**L[k]] for k in range(len(L))]
         S1 = prod(S[k][0] for k in range(len(S)))
@@ -110,7 +110,7 @@ class BinarySexticsCovariants(SageObject):
         def p(k,n):
             return Partitions(n,max_length=k, max_part=6).cardinality()
         return p(a,n) - p(a,n-1)
-        
+
     def Dimension(self):
         a = self.a
         b = self.b
@@ -158,7 +158,7 @@ class BinarySexticsCovariants(SageObject):
         C_basis = [covs[i][0] for i in coeffs_mat.pivot_rows()]
         assert len(C_basis) == dim
         return C_basis, rels, covs
-    
+
     def GetBasisAndRelationsCov(self):
         r"""
         Return the generators and relations for the covariants in the space of covariants of binary sextics
@@ -186,7 +186,7 @@ class BinarySexticsCovariants(SageObject):
             sage: basis, rels = bsc.GetBasisAndRelationsCov()
             sage: rels
             [1953125*Co20^9*Co40^3 - 15000000*Co20^7*Co40^4 - 1171875*Co20^8*Co40^2*Co60 + 43200000*Co20^5*Co40^5 + 4125000*Co20^6*Co40^3*Co60 + 234375*Co20^7*Co40*Co60^2 - 55296000*Co20^3*Co40^6 + 2160000*Co20^4*Co40^4*Co60 + 900000*Co20^5*Co40^2*Co60^2 - 15625*Co20^6*Co60^3 + 1687500*Co20^6*Co40^2*Co100 + 26542080*Co20*Co40^7 - 20736000*Co20^2*Co40^5*Co60 - 6048000*Co20^3*Co40^3*Co60^2 - 375000*Co20^4*Co40*Co60^3 - 9720000*Co20^4*Co40^3*Co100 - 675000*Co20^5*Co40*Co60*Co100 + 18579456*Co40^6*Co60 + 6635520*Co20*Co40^4*Co60^2 + 806400*Co20^2*Co40^2*Co60^3 + 30000*Co20^3*Co60^4 + 18662400*Co20^2*Co40^4*Co100 + 2592000*Co20^3*Co40^2*Co60*Co100 + 67500*Co20^4*Co60^2*Co100 - 55296*Co40^3*Co60^3 - 11520*Co20*Co40*Co60^4 - 11943936*Co40^5*Co100 - 2488320*Co20*Co40^3*Co60*Co100 + 486000*Co20^3*Co40*Co100^2 + 1152*Co60^5 - 248832*Co40^2*Co60^2*Co100 - 25920*Co20*Co60^3*Co100 - 933120*Co20*Co40^2*Co100^2 - 97200*Co20^2*Co60*Co100^2 + 93312*Co40*Co60*Co100^2 + 46656*Co100^3 + 14929920000000000*Co150^2]
-        
+
         """
         C_basis, rels, covs = self._ComputeBasisAndRelationsCov()
         rels_symb = [sum([rel[i]*covs[i][0] for i in range(len(covs))]) for rel in rels]

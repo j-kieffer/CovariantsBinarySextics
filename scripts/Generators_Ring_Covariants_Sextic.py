@@ -18,10 +18,10 @@ def GetRingGeneratorsCov():
     x, y = R.gens()
     f = AlgebraicForm(2, 6, sum([a[i]*x**(6-i)*y**i for i in range(7)]))
     C = {}
-        
+
     C[(1,6)] = [f]
 
-    C[(2,0)] = [transvectant(f, f, 6)]   
+    C[(2,0)] = [transvectant(f, f, 6)]
     C[(2,4)] = [transvectant(f, f, 4)]
     C[(2,8)] = [transvectant(f, f, 2)]
 
@@ -29,7 +29,7 @@ def GetRingGeneratorsCov():
     C[(3,6)] = [transvectant(f, C[(2,4)][0], 2)]
     C[(3,8)] = [transvectant(f, C[(2,4)][0], 1)]
     C[(3,12)] = [transvectant(f, C[(2,8)][0], 1)]
-        
+
     C[(4,0)] = [transvectant(C[(2,4)][0], C[(2,4)][0], 4)]
     C[(4,4)] = [transvectant(f, C[(3,2)][0], 2)]
     C[(4,6)] = [transvectant(f, C[(3,2)][0], 1)]
@@ -38,28 +38,28 @@ def GetRingGeneratorsCov():
     C[(5,2)] = [transvectant(C[(2,4)][0], C[(3,2)][0], 2)]
     C[(5,4)] = [transvectant(C[(2,4)][0], C[(3,2)][0], 1)]
     C[(5,8)] = [transvectant(C[(2,8)][0], C[(3,2)][0], 1)]
-        
+
     C[(6,0)] = [transvectant(C[(3,2)][0], C[(3,2)][0], 2)]
     C[(6,6)] = [transvectant(C[(3,6)][0], C[(3,2)][0], 1), transvectant(C[(3,8)][0], C[(3,2)][0], 2)]
 
     C32_2 = transvectant(C[(3,2)][0],C[(3,2)][0],0)
-    
+
     C[(7,2)] = [transvectant(f, C32_2, 4)]
     C[(7,4)] = [transvectant(f, C32_2, 3)]
-    
+
     C[(8,2)] = [transvectant(C[(2,4)][0], C32_2, 3)]
-    
+
     C[(9,4)] = [transvectant(C[(3,8)][0], C32_2, 4)]
-    
+
     C32_3 = transvectant(C[(3,2)][0],C32_2,0)
-    
+
     C[(10,0)] = [transvectant(f, C32_3, 6)]
     C[(10,2)] = [transvectant(f, C32_3, 5)]
-        
+
     C[(12,2)] = [transvectant(C[(3,8)][0], C32_3, 6)]
-    
+
     C32_4 = transvectant(C32_2,C32_2,0)
-        
+
     C[(15,0)] = [transvectant(C[(3,8)][0], C32_4, 8)]
 
     LW = [k for k in C.keys()]
@@ -77,7 +77,7 @@ def GetRingGeneratorsCov():
     assert (len(LW) == len(LCo)) and (len(LCo) == len(LCov))
 
     DCov = {LCo[i] : LCov[i] for i in range(len(LCo))}
-    
+
     return LW, LCo, LCov, DCov
 
 def RingOfCovariants():
