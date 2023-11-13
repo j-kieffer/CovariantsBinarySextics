@@ -10,6 +10,80 @@ from sage.combinat.q_analogues import q_multinomial
 from sage.combinat.q_analogues import q_binomial
 from sage.combinat.integer_vector_weighted import WeightedIntegerVectors
 from Generators_Ring_Covariants_Sextic import GetRingGeneratorsCov
+from sage.misc.prandom import randint
+from sage.rings.invariants.invariant_theory import AlgebraicForm, transvectant
+from sage.arith.misc import next_prime
+from sage.rings.finite_rings.finite_field_constructor import GF
+
+def ListOfWeights():
+    return [(1, 6), (2, 0), (2, 4), (2, 8), (3, 2), (3, 6), (3, 8), (3, 12),
+            (4, 0), (4, 4), (4, 6), (4, 10), (5, 2), (5, 4), (5, 8), (6, 0),
+            (6, 6), (6, 6), (7, 2), (7, 4), (8, 2), (9, 4), (10, 0), (10, 2),
+            (12, 2), (15, 0)]
+
+# Only leading terms
+def EvaluateBasicCovariants(sextic):
+    LW = ListOfWeights()
+    R = sextic.base_ring()
+    C = {}
+    f = AlgebraicForm(2, 6, sextic)
+    cofactors = [1, 60, 75, 90, 2250, 2250, 450, 540, 11250, 67500, 13500,
+                 13500, 168750, 67500, 405000, 10125000, 2025000, 2700000, 151875000,
+                 60750000, 15187500, 9112500000, 227812500000, 13668750000,
+                 8201250000000, 384433593750];
+
+    C[(1,6)] = f
+    C[(2,0)] = transvectant(f, f, 6)
+    C[(2,4)] = transvectant(f, f, 4)
+    C[(2,8)] = transvectant(f, f, 2)
+    C[(3,2)] = transvectant(f, C[(2,4)], 4)
+    C[(3,6)] = transvectant(f, C[(2,4)], 2)
+    C[(3,8)] = transvectant(f, C[(2,4)], 1)
+    C[(3,12)] = transvectant(f, C[(2,8)], 1)
+    C[(4,0)] = transvectant(C[(2,4)], C[(2,4)], 4)
+    C[(4,4)] = transvectant(f, C[(3,2)], 2)
+    C[(4,6)] = transvectant(f, C[(3,2)], 1)
+    C[(4,10)] = transvectant(C[(2,8)], C[(2,4)], 1)
+    C[(5,2)] = transvectant(C[(2,4)], C[(3,2)], 2)
+    C[(5,4)] = transvectant(C[(2,4)], C[(3,2)], 1)
+    C[(5,8)] = transvectant(C[(2,8)], C[(3,2)], 1)
+    C[(6,0)] = transvectant(C[(3,2)], C[(3,2)], 2)
+    C[(6,6)] = transvectant(C[(3,6)], C[(3,2)], 1)
+    C[(6,6,2)] = transvectant(C[(3,8)], C[(3,2)], 2)
+    C32_2 = transvectant(C[(3,2)],C[(3,2)],0)
+    C[(7,2)] = transvectant(f, C32_2, 4)
+    C[(7,4)] = transvectant(f, C32_2, 3)
+    C[(8,2)] = transvectant(C[(2,4)], C32_2, 3)
+    C[(9,4)] = transvectant(C[(3,8)], C32_2, 4)
+    C32_3 = transvectant(C[(3,2)],C32_2,0)
+    C[(10,0)] = transvectant(f, C32_3, 6)
+    C[(10,2)] = transvectant(f, C32_3, 5)
+    C[(12,2)] = transvectant(C[(3,8)], C32_3, 6)
+    C32_4 = transvectant(C32_2,C32_2,0)
+    C[(15,0)] = transvectant(C[(3,8)], C32_4, 8)
+
+    for k in C.keys():
+        C[k] = R(C[k].polynomial().coefficient([k[1], 0]))
+    res = [C[wt] for wt in LW]
+    res[17] = C[(6,6,2)]
+    for k in range(26):
+        res[k] *= cofactors[k]
+    return res
+
+def EvaluateMonomialInCovariants(wt, basic):
+    R = basic[0].parent()
+    res = R(1)
+    for i in range(26):
+        res *= basic[i] ** wt[i]
+    return res
+
+def RandomSextic(R, bound):
+    x = R.gens()[0]
+    y = R.gens()[1]
+    f = R(0)
+    for i in range(7):
+        f += randint(-bound, bound) * x ** i * y ** (6-i)
+    return f
 
 # we use a class in order to perform initialization only once
 
@@ -102,6 +176,12 @@ class BinarySexticsCovariants(SageObject):
             all_ws += [[w0] + w for w in ws]
         return all_ws
 
+    def MakeMonomial(self, wt):
+        res = 1
+        for i in range(26):
+            res *= BinarySexticsCovariants.LCo[i] ** wt[i]
+        return res
+
     def Dimension2(self):
         # using the Cayley-Sylvester formula
         a = self.a
@@ -126,10 +206,80 @@ class BinarySexticsCovariants(SageObject):
             d = f.list()[n]
             return d
 
+    # This is slowish (Gauss pivot on a possibly huge matrix over QQ...)
     def _ComputeBasisAndRelationsCov(self):
         r"""
         Computes the basis and relations for both of the following functions
         """
+        LW = ListOfWeights()
+        W = BinarySexticsCovariants.GetGeneratorsCov(LW, self.weight)
+        dim = self.Dimension()
+        if (dim == 0):
+            return [], [], []
+        eval_data = []
+        R = PolynomialRing(QQ, ["x", "y"])
+
+        for i in range(dim):
+            f = RandomSextic(R, 10)
+            basic = EvaluateBasicCovariants(f)
+            new_eval = [EvaluateMonomialInCovariants(wt, basic) for wt in W]
+            eval_data.append(new_eval)
+
+        eval_mat = Matrix(eval_data).transpose()
+        print("Computing rank (size {} * {})...".format(len(W), dim))
+        rk = eval_mat.rank()
+        print("done")
+        while (rk < dim):
+            print("One more evaluation point (current rank {})".format(rk))
+            f = RandomSextic(R, 100)
+            basic = EvaluateBasicCovariants(f)
+            new_eval = [EvaluateMonomialInCovariants(wt, basic) for wt in W]
+            eval_data.append(new_eval)
+            eval_mat = Matrix(eval_data).transpose()
+            rk = eval_mat.rank()
+
+        rels = eval_mat.kernel().basis()
+        rels = [rel.denominator() * rel for rel in rels]
+        C_basis = [self.MakeMonomial(W[i]) for i in eval_mat.pivot_rows()]
+        covs = [self.MakeMonomial(wt) for wt in W]
+        assert len(C_basis) == dim
+        return C_basis, rels, covs
+
+    # Use a finite field instead
+    def _ComputeBasisCov(self):
+        LW = ListOfWeights()
+        W = BinarySexticsCovariants.GetGeneratorsCov(LW, self.weight)
+        dim = self.Dimension()
+        if (dim == 0):
+            return []
+        eval_data = []
+        R = PolynomialRing(QQ, ["x", "y"])
+        for i in range(dim):
+            f = RandomSextic(R, 10)
+            basic = EvaluateBasicCovariants(f)
+            new_eval = [EvaluateMonomialInCovariants(wt, basic) for wt in W]
+            eval_data.append(new_eval)
+
+        exp = 10
+        bound = 10
+        p = next_prime(2**exp)
+        reduced_mat = Matrix(eval_data).change_ring(GF(p))
+        basis = reduced_mat.pivot_rows()
+        rk = len(basis)
+        while rk < dim:
+            exp += 10
+            bound += 10
+            f = RandomSextic(R, bound)
+            basic = EvaluateBasicCovariants(f)
+            new_eval = [EvaluateMonomialInCovariants(wt, basic) for wt in W]
+            eval_data.append(new_eval)
+            p = next_prime(2**exp)
+            reduced_mat = Matrix(eval_data).change_ring(GF(p))
+            basis = reduced_mat.pivot_rows()
+
+        return [self.MakeMonomial(W[i]) for i in basis]
+
+    def _ComputeBasisAndRelationsCovOld(self):
         print("    Getting generators of covariants...")
         W = BinarySexticsCovariants.GetGeneratorsCov(BinarySexticsCovariants.LW, self.weight)
         print("    Half done! MakeCov on {} vectors of exponents...".format(len(W)))
@@ -189,7 +339,7 @@ class BinarySexticsCovariants(SageObject):
 
         """
         C_basis, rels, covs = self._ComputeBasisAndRelationsCov()
-        rels_symb = [sum([rel[i]*covs[i][0] for i in range(len(covs))]) for rel in rels]
+        rels_symb = [sum([rel[i]*covs[i] for i in range(len(covs))]) for rel in rels]
         return C_basis, rels_symb
 
     def GetBasis(self):
@@ -213,5 +363,4 @@ class BinarySexticsCovariants(SageObject):
             [Co32*Co36, Co28*Co40, Co24*Co44, Co20*Co24^2, Co20^2*Co28, Co16*Co20*Co32]
 
         """
-        C_basis, rels, covs = self._ComputeBasisAndRelationsCov()
-        return C_basis
+        return self._ComputeBasisCov()
