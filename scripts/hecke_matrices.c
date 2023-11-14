@@ -309,7 +309,7 @@ hecke_add_term(acb_mat_struct* hecke, slong nb_spaces, const slong* dims,
             }
             if (characters[i])
             {
-                if (s == 0 && p == 2)
+                if (p == 2 && k < 8)
                 {
                     flint_printf("skipped\n");
                     continue;

@@ -12,12 +12,109 @@ from sage.rings.big_oh import O
 from sage.rings.number_field.number_field import QuadraticField
 from sage.functions.other import factorial
 
+#Here R is of the form A/I where A = QQ[q18, q38, s], I is the ideal generated
+#by q18^j q38^k s^l for all (j,k) such that j+k > q_prec and l > s_prec, and s
+#is such that q12 - 1 = s. Power of i is omitted.
+def ThetaExpansion(R, q_prec, s_prec, char, gradient = [0,0]):
+    q18 = R.gen(0)
+    q38 = R.gen(1)
+    #q24 is (1 + s)^(1/4), get power series expansion
+    s = R.gen(2)
+    q24 = R(0)
+    c = QQ(1)
+    d = QQ(1)/4
+    for i in range(s_prec + 1):
+        q24 += c/ZZ(i).factorial() * s ** i
+        c *= d
+        d -= 1
+    #enumerate all points (n0,n1) such that (2*n0+a0)^2 + (2*n1+a1)^2 <= n
+    nmax = ceil((sqrt(q_prec) + 1)/2)
+    all_pts = []
+    for n0 in range(-nmax, nmax + 1):
+        for n1 in range(-nmax, nmax + 1):
+            if (2*n0+ char.mu1) ** 2 + (2*n1 + char.mu2) ** 2 <= q_prec:
+                all_pts.append([n0,n1])
+    #sum
+    res = R(0)
+    for pt in all_pts:
+        n0 = pt[0]
+        n1 = pt[1]
+        term = q24 ** ((2 * n0 + char.mu1) * (2 * n1 + char.mu2))
+        term *= q18 ** ((2 * n0 + char.mu1) ** 2) * q38 ** ((2 * n1 + char.mu2) ** 2)
+        term *= (n0 + char.mu1/2) ** gradient[0] * (n1 + char.mu2/2) ** gradient[1]
+        if (n0 * char.nu1 + n1 * char.nu2) % 2 == 1:
+            term = -term
+        res += term
+    return res
+
+def RingQuotient(q_prec, s_prec):
+    A = PolynomialRing(QQ, ["q1", "q3", "s"])
+    q1 = A.gen(0)
+    q3 = A.gen(1)
+    s = A.gen(2)
+    generators = [q1 ** i * q3 ** (q_prec + 1 - i)
+                  for i in range(q_prec + 2)] + [s**(s_prec + 1)]
+    I = A.ideal(generators)
+    R = A.quotient(I, names = ["q1", "q3", "s"])
+    return R
+
+def ConvertExpansion(qexp, s_exp):
+    R = qexp.parent()
+    coeffs = qexp.coefficients()
+    exponents = qexp.exponents()
+    res = R(0)
+    q1 = R.gen(0)
+    q3 = R.gen(1)
+    s = R.gen(2)
+    for i in range(len(exponents)):
+        e = exponents[i]
+        assert e[0] % 8 == 0 and e[1] % 8 == 0
+        res += coeffs[i] * q1 ** (e[0] / 8) * q3 ** (e[1] / 8) * s ** (e[2] + s_exp)
+    return res
+
+#This is divided by s^2
+def NormalizedChi10Expansion(q_prec, s_prec):
+    R8 = RingQuotient(8 * q_prec, s_prec + 2)
+    R = RingQuotient(q_prec, s_prec)
+    even = ThetaCharacteristic.get_even_chars()
+    res = R8(1)
+    for char in even:
+        res *= ThetaExpansion(R8, 8 * q_prec, s_prec + 2, char)
+    res = QQ(2) ** (-12) * res ** 2
+    res = R(ConvertExpansion(res.lift(), -2))
+    return res
+
+#This is divided by s
+def NormalizedChi86Expansion(q_prec, s_prec):
+    R8 = RingQuotient(8 * q_prec, s_prec + 1)
+    R8x = PolynomialRing(R8, "x")
+    x = R8x.gen()
+    even = ThetaCharacteristic.get_even_chars()
+    odd = ThetaCharacteristic.get_odd_chars()
+    res = R8x(1)
+    for char in even:
+        res *= ThetaExpansion(R8, 8 * q_prec, s_prec + 1, char)
+    for char in odd:
+        res *= (ThetaExpansion(R8, 8 * q_prec, s_prec + 1, char, gradient = [1,0]) * x
+                + ThetaExpansion(R8, 8 * q_prec, s_prec + 1, char, gradient = [0,1]))
+    res *= QQ(2) ** (-6)
+
+    R = RingQuotient(q_prec, s_prec)
+    Rxy = PolynomialRing(R, ["x", "y"])
+    x = Rxy.gen(0)
+    y = Rxy.gen(1)
+    coeffs = [R(ConvertExpansion(c.lift(), -1)) for c in res.coefficients(sparse=False)]
+    res = Rxy(0)
+    for i in range(7):
+        res += coeffs[i] * x ** i * y ** (6 - i)
+    return res
+
 class ThetaCharacteristic(SageObject):
 
     M2F2 = MatrixSpace(GF(2), 2)
     def M2F2_sort(a):
         return a.sort_key
-    
+
     def get_all_chars():
         return sorted([ThetaCharacteristic(x) for x in ThetaCharacteristic.M2F2], key=ThetaCharacteristic.M2F2_sort)
 
@@ -47,7 +144,7 @@ class ThetaCharacteristic(SageObject):
 
     def get_even_chars():
         return sorted([x for x in ThetaCharacteristic.get_all_chars() if x.is_even()], key=ThetaCharacteristic.M2F2_sort)
-    
+
     def __init__(self, mat):
         """
         initializes a characteristic from a 2 by 2 matrix over GF(2)
@@ -61,7 +158,7 @@ class ThetaCharacteristic(SageObject):
         self.nu2 = ZZ(self.nu[1])
         self.sort_key = tuple(list(self.mu) + list(self.nu))
         return
-    
+
     def is_odd(self):
         return self.mu*self.nu == 1
 
@@ -163,7 +260,7 @@ class ThetaWithChar(qExpSiegel):
         else:
             self.gens = r1, r12, r2, zeta1, zeta2
         self.qexp = theta + O(r1**(prec+1))
-        
+
 def CheckThetaConstant(char, prec):
     theta = ThetaWithChar(char, prec)
     r1, r12, r2, zeta1, zeta2 = theta.variables()
@@ -349,4 +446,3 @@ def rat_func_to_pow_ser(f):
     return R(f.numerator())/R(f.denominator())
 
 
-    
