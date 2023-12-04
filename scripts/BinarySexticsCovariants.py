@@ -5,7 +5,7 @@ This file contains functions to compute a basis for the space of covariants of b
 ## imports
 from functools import reduce
 from sage.structure.sage_object import SageObject
-from sage.all import Matrix, Partitions, ZZ, QQ, prod, Set, PolynomialRing
+from sage.all import Matrix, Partitions, ZZ, QQ, prod, Set, PolynomialRing, random_prime
 from sage.combinat.q_analogues import q_multinomial
 from sage.combinat.q_analogues import q_binomial
 from sage.combinat.integer_vector_weighted import WeightedIntegerVectors
@@ -21,8 +21,8 @@ def ListOfWeights():
             (6, 6), (6, 6), (7, 2), (7, 4), (8, 2), (9, 4), (10, 0), (10, 2),
             (12, 2), (15, 0)]
 
-# Only leading terms
-def EvaluateBasicCovariants(sextic):
+# Only leading coefficients by default, otherwise all coefficients
+def EvaluateBasicCovariants(sextic, leading_coefficient = True):
     LW = ListOfWeights()
     R = sextic.base_ring()
     C = {}
@@ -62,8 +62,17 @@ def EvaluateBasicCovariants(sextic):
     C32_4 = transvectant(C32_2,C32_2,0)
     C[(15,0)] = transvectant(C[(3,8)], C32_4, 8)
 
-    for k in C.keys():
-        C[k] = R(C[k].polynomial().coefficient([k[1], 0]))
+    #could be more efficient if we only want leading coefficient
+    if leading_coefficient:
+        for k in C.keys():
+            C[k] = R(C[k].polynomial().coefficient([k[1], 0]))
+    else:
+        Rx = PolynomialRing(R, "x")
+        for k in C.keys():
+            pol = C[k].polynomial()
+            coeffs = [pol.coefficient([i, k[1] - i]) for i in range(k[1] + 1)]
+            C[k] = Rx(coeffs)
+
     res = [C[wt] for wt in LW]
     res[17] = C[(6,6,2)]
     for k in range(26):
@@ -77,13 +86,45 @@ def EvaluateMonomialInCovariants(wt, basic):
         res *= basic[i] ** wt[i]
     return res
 
-def RandomSextic(R, bound):
+#this is just for testing.
+def EvaluatePolynomialInCovariants(pol, basic):
+    res = 0
+    w = pol.exponents()
+    c = pol.coefficients()
+    for i in range(len(c)):
+        res += c[i] * EvaluateMonomialInCovariants(w[i], basic)
+    return res
+
+def RandomSextic(R, bound, zeroa5a6 = False):
     x = R.gens()[0]
     y = R.gens()[1]
     f = R(0)
-    for i in range(7):
-        f += randint(-bound, bound) * x ** i * y ** (6-i)
+    start = 0
+    if zeroa5a6:
+        start = 2
+    for i in range(start, 7):
+        f += randint(1, bound) * x ** i * y ** (6-i)
     return f
+
+def RandomSL2(bound):
+    g = 2
+    while not g == 1:
+        a = randint(-bound, bound)
+        b = randint(-bound, bound)
+        g, u, v = ZZ(a).xgcd(b)
+    return Matrix([[a, b],[-v, u]])
+
+def QuarticTransform(f, mat):
+    R = f.parent()
+    a = mat[0,0]
+    b = mat[0,1]
+    c = mat[1,0]
+    d = mat[1,1]
+    x = R.gen(0)
+    y = R.gen(1)
+    q = f // x**2
+    q = q.subs({x: a*x + c*y, y: b*x + d*y})
+    return x**2 * q
 
 # we use a class in order to perform initialization only once
 
@@ -249,7 +290,9 @@ class BinarySexticsCovariants(SageObject):
     def _ComputeBasisCov(self):
         LW = ListOfWeights()
         W = BinarySexticsCovariants.GetGeneratorsCov(LW, self.weight)
+        print("ComputeBasisCov: starting dimension {}".format(len(W)))
         dim = self.Dimension()
+        print("ComputeBasisCov: target dimension {}".format(dim))
         if (dim == 0):
             return []
         eval_data = []
@@ -266,6 +309,7 @@ class BinarySexticsCovariants(SageObject):
         reduced_mat = Matrix(eval_data).change_ring(GF(p))
         basis = reduced_mat.pivot_rows()
         rk = len(basis)
+        print("ComputeBasisCov: dimension {}".format(rk))
         while rk < dim:
             exp += 10
             bound += 10
@@ -276,6 +320,7 @@ class BinarySexticsCovariants(SageObject):
             p = next_prime(2**exp)
             reduced_mat = Matrix(eval_data).change_ring(GF(p))
             basis = reduced_mat.pivot_rows()
+            print("ComputeBasisCov: dimension {}".format(rk))
 
         return [self.MakeMonomial(W[i]) for i in basis]
 
@@ -364,3 +409,85 @@ class BinarySexticsCovariants(SageObject):
 
         """
         return self._ComputeBasisCov()
+
+    def GetBasisWithConditions(self, bound = 6):
+        r"""
+        Return a set of linearly independent elements in the space of covariants that is
+        sufficient to generate the space of holomorphic Siegel modular forms of the
+        corresponding weight
+
+        OUTPUT: a list of polynomial in the basic covariants
+
+        EXAMPLES: todo
+        """
+
+        B = self.GetBasis()
+        W = [b.exponents()[0] for b in B]
+        R = PolynomialRing(QQ, ["x", "y"])
+        x = R.gen(0)
+        y = R.gen(1)
+        eval_data = []
+        nonincrease = 0
+        dim = len(B)
+        n = self.a - (self.b)/2
+        cusp = (n % 2 == 1)
+
+        #stop if done or unlucky four times
+        while nonincrease < bound:
+            f = RandomSextic(R, 10, zeroa5a6 = True)
+            mat = RandomSL2(10)
+            fp = QuarticTransform(f, mat)
+            basic = EvaluateBasicCovariants(f, leading_coefficient = False)
+            basicp = EvaluateBasicCovariants(fp, leading_coefficient = False)
+            a4 = f.coefficient(x**2 * y**4)
+            a4p = fp.coefficient(x**2 * y**4)
+
+            #evaluate basis elements
+            new_eval = [EvaluateMonomialInCovariants(wt, basic).coefficients(sparse = False)
+                        for wt in W]
+            new_evalp = [EvaluateMonomialInCovariants(wt, basicp).coefficients(sparse = False)
+                         for wt in W]
+            #padding in case the evaluation has smaller degree
+            for v in new_eval:
+                v += [0 for i in range(self.b + 1 - len(v))]
+            for v in new_evalp:
+                v += [0 for i in range(self.b + 1 - len(v))]
+            #these are polynomials in QQ[x] of degree self.b, all coefficients
+            #except leading term must vanish
+            for i in range(self.b):
+                eval_data.append([v[i] for v in new_eval])
+                eval_data.append([v[i] for v in new_evalp])
+            #additionally, leading coefficient divided by a4^n must be an invariant of quadrics
+            #if cusp, must be zero
+            if cusp:
+                eval_data.append([v[self.b] for v in new_eval])
+                eval_data.append([v[self.b] for v in new_evalp])
+            else:
+                line = [a4p ** (n//2) * new_eval[i][self.b]
+                        - a4 ** (n//2) * new_evalp[i][self.b] #no det since SL
+                        for i in range(len(B))]
+                eval_data.append(line)
+
+            #do linear algebra
+            next_dim = dim + 1
+            while next_dim > dim:
+                p = random_prime(10000)
+                mat = Matrix(GF(p), eval_data)
+                next_dim = len(B) - mat.rank()
+
+            if next_dim < dim:
+                nonincrease = 0
+            else:
+                nonincrease += 1
+            dim = next_dim
+            print("GetBasisWithConditions: dimension {}".format(dim))
+            eval_data = [eval_data[i] for i in mat.pivot_rows()]
+
+        LCs = mat.right_kernel().basis()
+        res = []
+        for LC in LCs:
+            cov = 0
+            for i in range(len(LC)):
+                cov += LC[i] * B[i]
+            res.append(cov / cov.content())
+        return res
