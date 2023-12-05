@@ -433,7 +433,7 @@ class BinarySexticsCovariants(SageObject):
         n = self.a - (self.b)/2
         cusp = (n % 2 == 1)
 
-        print("GetBasisWithConditions: collecting data...")
+        print("GetBasisWithConditions: starting dimension {}, collecting data...".format(dim))
         for k in range(dim + 4):
             f = RandomSextic(R, 100, zeroa5a6 = True)
             mat = RandomSL2(100)
@@ -473,6 +473,7 @@ class BinarySexticsCovariants(SageObject):
         print("GetBasisWithConditions: linear algebra...")
         mat = Matrix(QQ, eval_data)
         LCs = mat.right_kernel().basis()
+        print("GetBasisWithConditions: found dimension {}".format(len(LCs)))
         res = []
         for LC in LCs:
             cov = 0

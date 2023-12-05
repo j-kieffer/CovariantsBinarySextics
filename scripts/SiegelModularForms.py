@@ -1,14 +1,15 @@
-from functools import reduce
+#from functools import reduce
 from sage.structure.sage_object import SageObject
 from sage.matrix.constructor import Matrix
-from sage.modules.free_module import VectorSpace
-from sage.rings.big_oh import O
-from sage.rings.infinity import infinity
+#from sage.modules.free_module import VectorSpace
+#from sage.rings.big_oh import O
+#from sage.rings.infinity import infinity
 from sage.rings.rational_field import QQ
 from sage.rings.integer_ring import ZZ
+from sage.rings.finite_rings.finite_field_constructor import GF
 from sage.rings.polynomial.polynomial_ring_constructor import PolynomialRing
 from sage.all import NumberField, pari, random_prime
-from sage.sets.set import Set
+#from sage.sets.set import Set
 
 from BinarySexticsCovariants import BinarySexticsCovariants as BSC
 from BinarySexticsCovariants import EvaluateBasicCovariants
@@ -16,14 +17,14 @@ from DimFormulaSMFScalarValuedLevel1WithoutCharacter import dim_splitting_SV_All
 from DimFormulaSMFVectorValuedLevel1WithoutCharacter import dim_splitting_VV_All_weight
 from DimFormulaSMFScalarValuedLevel1WithCharacter import dim_splitting_SV_All_weight_charac
 from DimFormulaSMFVectorValuedLevel1WithCharacter import dim_splitting_VV_All_weight_charac
-from FJexp import VectorFJexp, FJexp
-from ThetaFourier import Chi, NewChi
+#from FJexp import VectorFJexp, FJexp
+from ThetaFourier import Chi
 from Generators_Ring_Covariants_Sextic import RingOfCovariants
 import subprocess
 
-def EvaluateCovariants(basis, chi):
-    RingCov = BSC.LCo[0].parent()
-    values = EvaluateBasicCovariants(chi)
+def EvaluateCovariants(basis, chi, leading_coefficient = True):
+    RingCov = RingOfCovariants()
+    values = EvaluateBasicCovariants(chi, leading_coefficient = leading_coefficient)
     subs_dict = {}
     for i in range(26):
         subs_dict[RingCov.gen(i)] = values[i]
@@ -86,166 +87,171 @@ class SMF(SageObject):
             self.dim = dim_splitting_VV_All_weight(self.k, self.j)['total_dim']
         return self.dim
 
-    def _subs_chi(basis, chi, t_chi, s_prec):
-        RingCov = BSC.LCov[0].parent()
-        basis_expanded = [RingCov(b.subs(BSC.DCov)) for b in basis]
-        exps = list(chi.dict().keys())
-        t_chi_vals = list(t_chi.coeffs.values())
-        R = t_chi_vals[0].parent()
-        t_chi_comps = [t_chi.coeffs.get(exp, R(0)) for exp in exps]
-        assert len(t_chi_comps) == 7
-        gens = list(reduce(lambda x,y:x.union(y), [Set(b.variables()) for b in basis]))
-        gens_exp = [g.subs(BSC.DCov) for g in gens]
-        g_exps = [list(g_exp.dict().keys()) for g_exp in gens_exp]
-        b_exps = list(basis_expanded[0].dict().keys())
-        vals = list(basis_expanded[0].dict().values())
-        U = vals[0].parent()
-        a = U.gens()
-        g_comps = [[g.dict().get(exp,U(0)) for exp in g_exps[i]] for i,g in enumerate(gens_exp)]
-        sub_dict = {a[i] : t_chi_comps[i] for i in range(7)}
-        g_comps_expanded = [[R(g_c.subs(sub_dict)) for g_c in g_comps_s] for g_comps_s in g_comps]
-        g_c_e = [VectorFJexp([g_exps[l], g_comps_expanded[l]]) for l in range(len(g_exps))]
-        g_sub_dict = {gens[i] : g_c_e[i] for i in range(len(gens))}
-        b_comps_exp = [b.subs(g_sub_dict) for b in basis]
-        #the above line is completely broken when b = 1, so instead, do:
-        for l in range(len(b_comps_exp)):
-            if basis[l] == 1:
-                b_comps_exp[l] = VectorFJexp(chi.parent()(1), s_prec)
-        return b_comps_exp, b_exps
+    # def _subs_chi(basis, chi, t_chi, s_prec):
+    #     RingCov = BSC.LCov[0].parent()
+    #     basis_expanded = [RingCov(b.subs(BSC.DCov)) for b in basis]
+    #     exps = list(chi.dict().keys())
+    #     t_chi_vals = list(t_chi.coeffs.values())
+    #     R = t_chi_vals[0].parent()
+    #     t_chi_comps = [t_chi.coeffs.get(exp, R(0)) for exp in exps]
+    #     assert len(t_chi_comps) == 7
+    #     gens = list(reduce(lambda x,y:x.union(y), [Set(b.variables()) for b in basis]))
+    #     gens_exp = [g.subs(BSC.DCov) for g in gens]
+    #     g_exps = [list(g_exp.dict().keys()) for g_exp in gens_exp]
+    #     b_exps = list(basis_expanded[0].dict().keys())
+    #     vals = list(basis_expanded[0].dict().values())
+    #     U = vals[0].parent()
+    #     a = U.gens()
+    #     g_comps = [[g.dict().get(exp,U(0)) for exp in g_exps[i]] for i,g in enumerate(gens_exp)]
+    #     sub_dict = {a[i] : t_chi_comps[i] for i in range(7)}
+    #     g_comps_expanded = [[R(g_c.subs(sub_dict)) for g_c in g_comps_s] for g_comps_s in g_comps]
+    #     g_c_e = [VectorFJexp([g_exps[l], g_comps_expanded[l]]) for l in range(len(g_exps))]
+    #     g_sub_dict = {gens[i] : g_c_e[i] for i in range(len(gens))}
+    #     b_comps_exp = [b.subs(g_sub_dict) for b in basis]
+    #     #the above line is completely broken when b = 1, so instead, do:
+    #     for l in range(len(b_comps_exp)):
+    #         if basis[l] == 1:
+    #             b_comps_exp[l] = VectorFJexp(chi.parent()(1), s_prec)
+    #     return b_comps_exp, b_exps
 
-    def _create_coeff_matrix(b_comps_exp, b_exps, qexp, i, up_to_val):
-        Rs = reduce(lambda x,y: x + y,
-                    [reduce(lambda x,y : x + y,
-                            [list(b_c.coeffs.values()) for b_c in b_c_e.coeffs.values()])
-                     for b_c_e in b_comps_exp])[0].parent()
-        all_vals = []
-        all_coeffs = []
-        for b_c_e in b_comps_exp:
-            b_c = b_c_e.coeffs[b_exps[i]]
-            mon = b_c.coeffs.get(qexp, Rs(0))
-            v = mon.valuation()
-            coeffs = list(mon)
-            all_vals.append(v)
-            if (v >= up_to_val):
-                all_coeffs.append([])
-            else:
-                all_coeffs.append(coeffs[:up_to_val-v])
-        min_val = min(all_vals)
-        if (min_val < up_to_val):
-            max_len = max([len(all_coeffs[j]) + all_vals[j] for j in range(len(all_vals)) if all_vals[j] < up_to_val])
-            for j in range(len(all_vals)):
-                v = all_vals[j]
-                if (v >= up_to_val):
-                    v = max_len
-                all_coeffs[j] = [0 for l in range(v-min_val)] + all_coeffs[j]
-        max_len = max([len(a) for a in all_coeffs])
-        all_coeffs = [a + [0 for j in range(max_len-len(a))] for a in all_coeffs]
-        mat_coeffs = Matrix(all_coeffs)
-        return mat_coeffs
+    # def _create_coeff_matrix(b_comps_exp, b_exps, qexp, i, up_to_val):
+    #     Rs = reduce(lambda x,y: x + y,
+    #                 [reduce(lambda x,y : x + y,
+    #                         [list(b_c.coeffs.values()) for b_c in b_c_e.coeffs.values()])
+    #                  for b_c_e in b_comps_exp])[0].parent()
+    #     all_vals = []
+    #     all_coeffs = []
+    #     for b_c_e in b_comps_exp:
+    #         b_c = b_c_e.coeffs[b_exps[i]]
+    #         mon = b_c.coeffs.get(qexp, Rs(0))
+    #         v = mon.valuation()
+    #         coeffs = list(mon)
+    #         all_vals.append(v)
+    #         if (v >= up_to_val):
+    #             all_coeffs.append([])
+    #         else:
+    #             all_coeffs.append(coeffs[:up_to_val-v])
+    #     min_val = min(all_vals)
+    #     if (min_val < up_to_val):
+    #         max_len = max([len(all_coeffs[j]) + all_vals[j] for j in range(len(all_vals)) if all_vals[j] < up_to_val])
+    #         for j in range(len(all_vals)):
+    #             v = all_vals[j]
+    #             if (v >= up_to_val):
+    #                 v = max_len
+    #             all_coeffs[j] = [0 for l in range(v-min_val)] + all_coeffs[j]
+    #     max_len = max([len(a) for a in all_coeffs])
+    #     all_coeffs = [a + [0 for j in range(max_len-len(a))] for a in all_coeffs]
+    #     mat_coeffs = Matrix(all_coeffs)
+    #     return mat_coeffs
 
-    def _solve_linear_system(V, b_comps_exp, b_exps, up_to_val=0):
-        ker = V
-        qexps = reduce(lambda x,y: x.union(y),
-                       [reduce(lambda x,y: x.union(y),
-                               [Set(list(b_c.coeffs.keys()))
-                                for b_c in b_c_e.coeffs.values()])
-                        for b_c_e in b_comps_exp])
-        for qexp in qexps:
-            for i in range(len(b_exps)):
-                mat_coeffs = SMF._create_coeff_matrix(b_comps_exp, b_exps, qexp, i, up_to_val)
-                ker_mat = mat_coeffs.kernel()
-                ker = ker.intersection(ker_mat)
-        return ker
+    # def _solve_linear_system(V, b_comps_exp, b_exps, up_to_val=0):
+    #     ker = V
+    #     qexps = reduce(lambda x,y: x.union(y),
+    #                    [reduce(lambda x,y: x.union(y),
+    #                            [Set(list(b_c.coeffs.keys()))
+    #                             for b_c in b_c_e.coeffs.values()])
+    #                     for b_c_e in b_comps_exp])
+    #     for qexp in qexps:
+    #         for i in range(len(b_exps)):
+    #             mat_coeffs = SMF._create_coeff_matrix(b_comps_exp, b_exps, qexp, i, up_to_val)
+    #             ker_mat = mat_coeffs.kernel()
+    #             ker = ker.intersection(ker_mat)
+    #     return ker
 
-    def _GetBasisWithPoles(bsc, prec, taylor_prec, pole_ord, dim):
-        print("Creating basis of covariants...")
-        basis = bsc.GetBasis()
-        print("Done!")
-        if (len(basis) == 0):
-            basis = []
-            return basis, prec, taylor_prec
+    # def _GetBasisWithPoles(bsc, prec, taylor_prec, pole_ord, dim):
+    #     print("Creating basis of covariants...")
+    #     basis = bsc.GetBasis()
+    #     print("Done!")
+    #     if (len(basis) == 0):
+    #         basis = []
+    #         return basis, prec, taylor_prec
 
-        V = VectorSpace(QQ, len(basis))
-        ker = V
-        prec = prec-1
-        s_prec = taylor_prec-10
-        print("Attempting to find a basis for covariants in "+str(bsc)+" with pole of order at most "+str(pole_ord))
-        print("Trying to get to dimension ", dim)
-        is_first_outer = True
-        while ((is_first_outer) or (ker.dimension() > dim)):
-            is_first_outer = False
-            prec += 1
-            if (SMF.prec < prec):
-                print("Recomputing expansion of chi_6_m_2 to precision {}...".format(prec))
-                SMF.chi = Chi(6,-2).GetFJexp(prec)
-                SMF.prec = prec
-                print("Done!")
+    #     V = VectorSpace(QQ, len(basis))
+    #     ker = V
+    #     prec = prec-1
+    #     s_prec = taylor_prec-10
+    #     print("Attempting to find a basis for covariants in "+str(bsc)+" with pole of order at most "+str(pole_ord))
+    #     print("Trying to get to dimension ", dim)
+    #     is_first_outer = True
+    #     while ((is_first_outer) or (ker.dimension() > dim)):
+    #         is_first_outer = False
+    #         prec += 1
+    #         if (SMF.prec < prec):
+    #             print("Recomputing expansion of chi_6_m_2 to precision {}...".format(prec))
+    #             SMF.chi = Chi(6,-2).GetFJexp(prec)
+    #             SMF.prec = prec
+    #             print("Done!")
 
-            ker_dim = infinity
-            is_first = True
-            while ((is_first) or
-                   ((ker.dimension() > dim) and (ker.dimension() < ker_dim))):
-                print("Dimension obtained is ", ker.dimension())
-                is_first = False
-                ker_dim = ker.dimension()
-                s_prec += 10
-                # Compute Taylor expansion: this is cheap.
-                print("increasing precision in s to {}...".format(s_prec))
-                t_chi = VectorFJexp(SMF.chi, s_prec)
+    #         ker_dim = infinity
+    #         is_first = True
+    #         while ((is_first) or
+    #                ((ker.dimension() > dim) and (ker.dimension() < ker_dim))):
+    #             print("Dimension obtained is ", ker.dimension())
+    #             is_first = False
+    #             ker_dim = ker.dimension()
+    #             s_prec += 10
+    #             # Compute Taylor expansion: this is cheap.
+    #             print("increasing precision in s to {}...".format(s_prec))
+    #             t_chi = VectorFJexp(SMF.chi, s_prec)
 
-                # Substitution
-                print("Substituting chi_6_m_2 in basis...")
-                b_comps_exp, b_exps = SMF._subs_chi(basis, SMF.chi, t_chi, s_prec)
-                print("Done!")
+    #             # Substitution
+    #             print("Substituting chi_6_m_2 in basis...")
+    #             b_comps_exp, b_exps = SMF._subs_chi(basis, SMF.chi, t_chi, s_prec)
+    #             print("Done!")
 
-                #Linear algebra
-                print("Solving linear system...")
-                ker = SMF._solve_linear_system(V, b_comps_exp, b_exps, up_to_val= -pole_ord)
-                print("Done!")
+    #             #Linear algebra
+    #             print("Solving linear system...")
+    #             ker = SMF._solve_linear_system(V, b_comps_exp, b_exps, up_to_val= -pole_ord)
+    #             print("Done!")
 
-        # Take only highest valuations
-        basis = [sum([b.denominator()*b[i]*basis[i] for i in range(len(basis))]) for b in ker.basis()]
-        return basis, prec, s_prec
+    #     # Take only highest valuations
+    #     basis = [sum([b.denominator()*b[i]*basis[i] for i in range(len(basis))]) for b in ker.basis()]
+    #     return basis, prec, s_prec
 
-    def _NewGetBasisWithPoles(basis, vanishing_order, dim):
+    def _GetBasisWithPoles(basis, vanishing_order, dim, vecj):
         if len(basis) == dim:
             return basis
-        print("NewGetBasisWithPoles: starting dimension {}, target {}".format(len(basis), dim))
+        print("GetBasisWithPoles: starting dimension {}, target {}".format(len(basis), dim))
 
-        RingCov = BSC.LCo[0].parent()
+        RingCov = RingOfCovariants()
         s_prec = vanishing_order - 1
         q_prec = 4
-        current_dim = 0
-        chi = NewChi(-2, 6).diagonal_expansion(1, 1)
+        current_dim = len(basis)
+        chi = Chi(-2, 6).diagonal_expansion(1, 1)
         R = chi.base_ring().cover_ring()
         q1 = R.gen(0)
         q3 = R.gen(1)
         s = R.gen(2)
 
-        while current_dim < dim:
-            chi = NewChi(-2, 6).diagonal_expansion(q_prec, s_prec)
-            print("NewGetBasisWithPoles: got q-expansion of chi(-2,6) at precision {}".format(q_prec))
-            qexps = EvaluateCovariants(basis, chi)
-            qexps = [a.lift() for a in qexps]
-            print("NewGetBasisWithPoles: got q-expansion of basis elements")
+        while current_dim > dim:
+            chi = Chi(-2, 6).diagonal_expansion(q_prec, s_prec)
+            print("GetBasisWithPoles: looking for vanishing at order {} along diagonal".format(vanishing_order))
+            print("GetBasisWithPoles: got q-expansion of chi(-2,6) at precision {}".format(q_prec))
+            qexps = EvaluateCovariants(basis, chi, leading_coefficient = False)
+            print("GetBasisWithPoles: got q-expansion of basis elements")
             monomials = []
             for i in range(q_prec + 1):
                 for j in range(q_prec + 1):
                     if i + j <= q_prec:
                         for k in range(s_prec + 1):
-                            monomials.append([i,j,k])
+                            for l in range(vecj + 1):
+                                monomials.append([[i,j,k], l])
             nb = len(monomials)
             mat = Matrix(QQ, nb, len(basis))
             for j in range(len(basis)):
+                coeffs = qexps[j].coefficients(sparse = False)
+                coeffs = [c.lift() for c in coeffs]
+                coeffs += [R(0) for l in range(vecj + 1 - len(coeffs))]
                 for i in range(nb):
-                    mat[i, j] = qexps[j].coefficient(monomials[i])
+                    e, l = monomials[i]
+                    mat[i, j] = coeffs[l].coefficient(e)
             p = random_prime(10000)
             try:
                 mat_p = mat.change_ring(GF(p))
             except: #p divides some denominator, stay in QQ
                 mat_p = mat
             current_dim = len(basis) - mat_p.rank()
-            print ("NewGetBasisWithPoles: Found dimension {} at q-precision {}".format(current_dim, q_prec))
+            print ("GetBasisWithPoles: found dimension {} at q-precision {}".format(current_dim, q_prec))
             q_prec += 4
 
         ker = mat.right_kernel().basis()
@@ -258,36 +264,36 @@ class SMF(SageObject):
             res.append(c)
         return res
 
-    def GetBasis(self, prec=3, taylor_prec=20):
-        if (not self.basis is None and prec <= self.prec):
-            return self.basis
+    # def GetBasis(self, prec=3, taylor_prec=20):
+    #     if (not self.basis is None and prec <= self.prec):
+    #         return self.basis
 
-        k = self.k
-        j = self.j
-        chi10 = SMF._GetBasisWithPoles(BSC(10,0), prec, taylor_prec, -1, 1)[0][0]
-        self.basis = []
-        dim = self.Dimension()
+    #     k = self.k
+    #     j = self.j
+    #     chi10 = SMF._GetBasisWithPoles(BSC(10,0), prec, taylor_prec, -1, 1)[0][0]
+    #     self.basis = []
+    #     dim = self.Dimension()
 
-        a_max = k + j//2
-        if (self.character):
-            a_max -= 5
+    #     a_max = k + j//2
+    #     if (self.character):
+    #         a_max -= 5
 
-        a_min = a_max % 10
-        pole_ord = 2 * (a_max // 10)
-        if (self.character):
-            pole_ord += 1
+    #     a_min = a_max % 10
+    #     pole_ord = 2 * (a_max // 10)
+    #     if (self.character):
+    #         pole_ord += 1
 
-        a = a_min
-        while (len(self.basis) < dim):
-            bsc = BSC(a, j)
-            self.basis, self.prec, self.s_prec = SMF._GetBasisWithPoles(bsc, prec, taylor_prec, pole_ord, dim)
-            self.basis = [(chi10)**(pole_ord // 2) * b for b in self.basis]
-            a += 10
-            pole_ord -= 2
+    #     a = a_min
+    #     while (len(self.basis) < dim):
+    #         bsc = BSC(a, j)
+    #         self.basis, self.prec, self.s_prec = SMF._GetBasisWithPoles(bsc, prec, taylor_prec, pole_ord, dim)
+    #         self.basis = [(chi10)**(pole_ord // 2) * b for b in self.basis]
+    #         a += 10
+    #         pole_ord -= 2
 
-        return self.basis
+    #     return self.basis
 
-    def NewGetBasis(self):
+    def GetBasis(self):
         if not self.basis is None:
             return self.basis
 
@@ -304,7 +310,7 @@ class SMF(SageObject):
             a -= 5
             vanishing_order -= 6
             basis = BSC(a, j).GetBasis()
-        return SMF._NewGetBasisWithPoles(basis, vanishing_order, dim)
+        return SMF._GetBasisWithPoles(basis, vanishing_order, dim, j)
 
     def WriteBasisToFile(self, filename, mode):
         d = self.Dimension()
