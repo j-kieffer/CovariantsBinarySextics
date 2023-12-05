@@ -8,7 +8,8 @@ from sage.rings.rational_field import QQ
 from sage.rings.integer_ring import ZZ
 from sage.rings.finite_rings.finite_field_constructor import GF
 from sage.rings.polynomial.polynomial_ring_constructor import PolynomialRing
-from sage.all import NumberField, pari, random_prime
+from sage.all import NumberField, pari, random_prime, Set
+from sage.functions.other import ceil, floor
 #from sage.sets.set import Set
 
 from BinarySexticsCovariants import BinarySexticsCovariants as BSC
@@ -24,11 +25,35 @@ import subprocess
 
 def EvaluateCovariants(basis, chi, leading_coefficient = True):
     RingCov = RingOfCovariants()
+    R = chi.base_ring()
+    if not leading_coefficient:
+        R = PolynomialRing(R, "x")
+
+    print("EvaluateCovariants: computing transvectants...")
     values = EvaluateBasicCovariants(chi, leading_coefficient = leading_coefficient)
     subs_dict = {}
     for i in range(26):
         subs_dict[RingCov.gen(i)] = values[i]
-    return [b.subs(subs_dict) for b in basis]
+    monomials = Set([])
+    for b in basis:
+        monomials = monomials.union(Set(b.monomials()))
+    monomials = monomials.list()
+
+    print("EvaluateCovariants: substitution in {} monomials...".format(len(monomials)))
+    subs_mon = {}
+    for m in monomials:
+        subs_mon[m] = m.subs(subs_dict)
+
+    print("EvaluateCovariants: linear combinations...")
+    res = []
+    for b in basis:
+        c = R(0)
+        mons = b.monomials()
+        coeffs = b.coefficients()
+        for i in range(len(mons)):
+            c += coeffs[i] * subs_mon[mons[i]]
+        res.append(c)
+    return res
 
 class SMF(SageObject):
     r"""
@@ -208,14 +233,16 @@ class SMF(SageObject):
     #     basis = [sum([b.denominator()*b[i]*basis[i] for i in range(len(basis))]) for b in ker.basis()]
     #     return basis, prec, s_prec
 
-    def _GetBasisWithPoles(basis, vanishing_order, dim, vecj):
+    def _GetBasis(basis, vanishing_order, dim, vecj):
         if len(basis) == dim:
             return basis
-        print("GetBasisWithPoles: starting dimension {}, target {}".format(len(basis), dim))
+        if dim == 0:
+            return []
+        print("GetBasis: starting dimension {}, target {}".format(len(basis), dim))
 
         RingCov = RingOfCovariants()
         s_prec = vanishing_order - 1
-        q_prec = 4
+        q_prec = 2
         current_dim = len(basis)
         chi = Chi(-2, 6).diagonal_expansion(1, 1)
         R = chi.base_ring().cover_ring()
@@ -225,19 +252,19 @@ class SMF(SageObject):
 
         while current_dim > dim:
             chi = Chi(-2, 6).diagonal_expansion(q_prec, s_prec)
-            print("GetBasisWithPoles: looking for vanishing at order {} along diagonal".format(vanishing_order))
-            print("GetBasisWithPoles: got q-expansion of chi(-2,6) at precision {}".format(q_prec))
+            print("GetBasis: looking for vanishing at order {} along diagonal".format(vanishing_order))
+            print("GetBasis: got q-expansion of chi(-2,6) at precision {}".format(q_prec))
             qexps = EvaluateCovariants(basis, chi, leading_coefficient = False)
-            print("GetBasisWithPoles: got q-expansion of basis elements")
+            print("GetBasis: got q-expansion of basis elements")
             monomials = []
             for i in range(q_prec + 1):
                 for j in range(q_prec + 1):
-                    if i + j <= q_prec:
-                        for k in range(s_prec + 1):
-                            for l in range(vecj + 1):
-                                monomials.append([[i,j,k], l])
+                    for k in range(s_prec + 1):
+                        for l in range(vecj + 1):
+                            monomials.append([[i,j,k], l])
             nb = len(monomials)
             mat = Matrix(QQ, nb, len(basis))
+            print("GetBasis: building matrix (size {} x {})".format(nb, len(basis)))
             for j in range(len(basis)):
                 coeffs = qexps[j].coefficients(sparse = False)
                 coeffs = [c.lift() for c in coeffs]
@@ -246,22 +273,28 @@ class SMF(SageObject):
                     e, l = monomials[i]
                     mat[i, j] = coeffs[l].coefficient(e)
             p = random_prime(10000)
-            try:
-                mat_p = mat.change_ring(GF(p))
-            except: #p divides some denominator, stay in QQ
-                mat_p = mat
+            print("GetBasis: linear algebra...")
+            mat = mat * mat.denominator()
+            mat = mat.change_ring(ZZ)
+            mat_p = mat.change_ring(GF(p))
             current_dim = len(basis) - mat_p.rank()
-            print ("GetBasisWithPoles: found dimension {} at q-precision {}".format(current_dim, q_prec))
-            q_prec += 4
+            print ("GetBasis: found dimension {} at q-precision {}".format(current_dim, q_prec))
+            rows = mat_p.pivot_rows()
+            mat = Matrix([mat.row(i) for i in rows])
+            q_prec = ceil(1.3 * q_prec + 2)
 
-        ker = mat.right_kernel().basis()
-        ker = [v * v.denominator() for v in ker]
+        ker = mat.right_kernel().basis_matrix()
+        print("GetBasis: lattice reduction...")
+        ker = ker.LLL()
         res = []
         for v in ker:
             c = RingCov(0)
             for i in range(len(basis)):
                 c += v[i] * basis[i]
+            c = c / c.content()
             res.append(c)
+
+        print("GetBasis: done")
         return res
 
     # def GetBasis(self, prec=3, taylor_prec=20):
@@ -301,6 +334,8 @@ class SMF(SageObject):
         j = self.j
         self.basis = []
         dim = self.Dimension()
+        if dim == 0:
+            return []
 
         a = k + j // 2
         vanishing_order = a
@@ -310,7 +345,7 @@ class SMF(SageObject):
             a -= 5
             vanishing_order -= 6
             basis = BSC(a, j).GetBasis()
-        return SMF._GetBasisWithPoles(basis, vanishing_order, dim, j)
+        return SMF._GetBasis(basis, vanishing_order, dim, j)
 
     def WriteBasisToFile(self, filename, mode):
         d = self.Dimension()

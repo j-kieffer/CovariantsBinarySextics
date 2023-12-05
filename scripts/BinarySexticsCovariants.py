@@ -33,34 +33,60 @@ def EvaluateBasicCovariants(sextic, leading_coefficient = True):
                  8201250000000, 384433593750];
 
     C[(1,6)] = f
+    #print("Transvectants: {} done".format(len(C.keys())))
     C[(2,0)] = transvectant(f, f, 6)
+    #print("Transvectants: {} done".format(len(C.keys())))
     C[(2,4)] = transvectant(f, f, 4)
+    #print("Transvectants: {} done".format(len(C.keys())))
     C[(2,8)] = transvectant(f, f, 2)
+    #print("Transvectants: {} done".format(len(C.keys())))
     C[(3,2)] = transvectant(f, C[(2,4)], 4)
+    #print("Transvectants: {} done".format(len(C.keys())))
     C[(3,6)] = transvectant(f, C[(2,4)], 2)
+    #print("Transvectants: {} done".format(len(C.keys())))
     C[(3,8)] = transvectant(f, C[(2,4)], 1)
+    #print("Transvectants: {} done".format(len(C.keys())))
     C[(3,12)] = transvectant(f, C[(2,8)], 1)
+    #print("Transvectants: {} done".format(len(C.keys())))
     C[(4,0)] = transvectant(C[(2,4)], C[(2,4)], 4)
+    #print("Transvectants: {} done".format(len(C.keys())))
     C[(4,4)] = transvectant(f, C[(3,2)], 2)
+    #print("Transvectants: {} done".format(len(C.keys())))
     C[(4,6)] = transvectant(f, C[(3,2)], 1)
+    #print("Transvectants: {} done".format(len(C.keys())))
     C[(4,10)] = transvectant(C[(2,8)], C[(2,4)], 1)
+    #print("Transvectants: {} done".format(len(C.keys())))
     C[(5,2)] = transvectant(C[(2,4)], C[(3,2)], 2)
+    #print("Transvectants: {} done".format(len(C.keys())))
     C[(5,4)] = transvectant(C[(2,4)], C[(3,2)], 1)
+    #print("Transvectants: {} done".format(len(C.keys())))
     C[(5,8)] = transvectant(C[(2,8)], C[(3,2)], 1)
+    #print("Transvectants: {} done".format(len(C.keys())))
     C[(6,0)] = transvectant(C[(3,2)], C[(3,2)], 2)
+    #print("Transvectants: {} done".format(len(C.keys())))
     C[(6,6)] = transvectant(C[(3,6)], C[(3,2)], 1)
+    #print("Transvectants: {} done".format(len(C.keys())))
     C[(6,6,2)] = transvectant(C[(3,8)], C[(3,2)], 2)
+    #print("Transvectants: {} done".format(len(C.keys())))
     C32_2 = transvectant(C[(3,2)],C[(3,2)],0)
     C[(7,2)] = transvectant(f, C32_2, 4)
+    #print("Transvectants: {} done".format(len(C.keys())))
     C[(7,4)] = transvectant(f, C32_2, 3)
+    #print("Transvectants: {} done".format(len(C.keys())))
     C[(8,2)] = transvectant(C[(2,4)], C32_2, 3)
+    #print("Transvectants: {} done".format(len(C.keys())))
     C[(9,4)] = transvectant(C[(3,8)], C32_2, 4)
+    #print("Transvectants: {} done".format(len(C.keys())))
     C32_3 = transvectant(C[(3,2)],C32_2,0)
     C[(10,0)] = transvectant(f, C32_3, 6)
+    #print("Transvectants: {} done".format(len(C.keys())))
     C[(10,2)] = transvectant(f, C32_3, 5)
+    #print("Transvectants: {} done".format(len(C.keys())))
     C[(12,2)] = transvectant(C[(3,8)], C32_3, 6)
+    #print("Transvectants: {} done".format(len(C.keys())))
     C32_4 = transvectant(C32_2,C32_2,0)
     C[(15,0)] = transvectant(C[(3,8)], C32_4, 8)
+    #print("Transvectants: {} done".format(len(C.keys())))
 
     #could be more efficient if we only want leading coefficient
     if leading_coefficient:
@@ -309,7 +335,7 @@ class BinarySexticsCovariants(SageObject):
         bound = 10
         p = next_prime(2**exp)
         reduced_mat = Matrix(eval_data).change_ring(GF(p))
-        basis = reduced_mat.pivot_rows()
+        basis = reduced_mat.transpose().pivot_rows()
         rk = len(basis)
         print("ComputeBasisCov: found dimension {}".format(rk))
         while rk < dim:
@@ -424,6 +450,8 @@ class BinarySexticsCovariants(SageObject):
         """
 
         B = self.GetBasis()
+        if len(B) == 0:
+            return []
         W = [b.exponents()[0] for b in B]
         R = PolynomialRing(QQ, ["x", "y"])
         x = R.gen(0)
@@ -435,7 +463,7 @@ class BinarySexticsCovariants(SageObject):
 
         print("GetBasisWithConditions: starting dimension {}, collecting data...".format(dim))
         for k in range(dim + 4):
-            f = RandomSextic(R, 100, zeroa5a6 = True)
+            f = RandomSextic(R, 10, zeroa5a6 = True)
             mat = RandomSL2(100)
             fp = QuarticTransform(f, mat)
             basic = EvaluateBasicCovariants(f, leading_coefficient = False)
@@ -470,8 +498,12 @@ class BinarySexticsCovariants(SageObject):
                 eval_data.append(line)
 
         #do linear algebra
-        print("GetBasisWithConditions: linear algebra...")
-        mat = Matrix(QQ, eval_data)
+        print("GetBasisWithConditions: linear algebra over Fp...")
+        p = random_prime(10000)
+        mat = Matrix(GF(p), eval_data)
+        rows = mat.pivot_rows()
+        mat = Matrix(QQ, [eval_data[i] for i in rows])
+        print("GetBasisWithConditions: linear algebra over QQ (size {} x {})...".format(len(rows),dim))
         LCs = mat.right_kernel().basis()
         print("GetBasisWithConditions: found dimension {}".format(len(LCs)))
         res = []

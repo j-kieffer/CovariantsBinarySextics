@@ -106,13 +106,12 @@ class Chi(SageObject):
 
     def _theta(q18, q38, q24, q_prec, char, gradient = [0,0]):
         #omit power of i
-        #enumerate all points (n0,n1) such that (2*n0+a0)^2 + (2*n1+a1)^2 <= q_prec
+        #enumerate all points (n0,n1) such that (2*n0+a0)^2 and (2*n1+a1)^2 <= q_prec
         nmax = ceil((sqrt(q_prec) + 1)/2)
         all_pts = []
         for n0 in range(-nmax, nmax + 1):
             for n1 in range(-nmax, nmax + 1):
-                if (2*n0+ char.mu1) ** 2 + (2*n1 + char.mu2) ** 2 <= q_prec:
-                    all_pts.append([n0,n1])
+                all_pts.append([n0,n1])
         #sum
         res = q18.parent()(0)
         for pt in all_pts:
@@ -141,8 +140,7 @@ class Chi(SageObject):
         q1 = A.gen(0)
         q3 = A.gen(1)
         s = A.gen(2)
-        generators = [q1 ** i * q3 ** (q_prec + 1 - i)
-                      for i in range(q_prec + 2)] + [s**(s_prec + 1)]
+        generators = [q1 ** (q_prec + 1), q3 ** (q_prec + 1), s**(s_prec + 1)]
         I = A.ideal(generators)
         R = A.quotient(I, names = ["q1", "q3", "s"])
         return R
@@ -153,8 +151,7 @@ class Chi(SageObject):
         q3 = A.gen(1)
         q2 = A.gen(2)
         q2inv = A.gen(3)
-        generators = [q1 ** i * q3 ** (q_prec + 1 - i)
-                      for i in range(q_prec + 2)] + [q2 * q2inv - 1];
+        generators = [q1 ** (q_prec + 1), q3 ** (q_prec + 1), q2 * q2inv - 1];
         I = A.ideal(generators)
         R = A.quotient(I, names = ["q1", "q3", "q2", "q2inv"])
         return R
@@ -170,10 +167,12 @@ class Chi(SageObject):
         for i in range(len(exponents)):
             e = exponents[i]
             assert e[0] % 8 == 0 and e[1] % 8 == 0
-            res += coeffs[i] * q1 ** (e[0] / 8 + q_shift) * q3 ** (e[1] / 8 + q_shift) * s ** (e[2] + s_shift)
+            assert e[0]/8 >= -q_shift and e[1]/8 >= -q_shift
+            assert e[2] >= -s_shift
+            res += coeffs[i] * q1**(e[0]/8 + q_shift) * q3**(e[1]/8 + q_shift) * s**(e[2] + s_shift)
         return res
 
-    def _cusp_convert(qexp, q1q3_shift = 0):
+    def _cusp_convert(qexp, q_shift = 0):
         R = qexp.parent()
         coeffs = qexp.coefficients()
         exponents = qexp.exponents()
@@ -185,7 +184,8 @@ class Chi(SageObject):
         for i in range(len(exponents)):
             e = exponents[i]
             assert e[0] % 8 == 0 and e[1] % 8 == 0 and e[2] % 4 == 0 and e[3] % 4 == 0
-            res += coeffs[i] * q1 ** (e[0] / 8 + q1q3_shift) * q3 ** (e[1] / 8 + q1q3_shift) * q2 ** (e[2] / 4) * q2inv ** (e[3] / 4)
+            assert e[0]/8 >= -q_shift and e[1]/8 >= -q_shift
+            res += coeffs[i] * q1**(e[0]/8 + q_shift) * q3**(e[1]/8 + q_shift) * q2 ** (e[2]/4) * q2inv ** (e[3]/4)
         return res
 
     def _binary_sextic(R, coeffs):
@@ -195,7 +195,7 @@ class Chi(SageObject):
         coeffs = coeffs + [0 for i in range(7 - len(coeffs))]
         res = Rxy(0)
         for i in range(7):
-            res += coeffs[i] * x ** i * y ** (6 - i)
+            res += coeffs[i] * x**i * y**(6 - i)
         return res
 
     def _cusp_div_diag(qexp, delta):
