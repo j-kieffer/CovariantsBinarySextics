@@ -12,102 +12,6 @@ from sage.rings.big_oh import O
 from sage.rings.number_field.number_field import QuadraticField
 from sage.functions.other import factorial
 
-#Here R is of the form A/I where A = QQ[q18, q38, s], I is the ideal generated
-#by q18^j q38^k s^l for all (j,k) such that j+k > q_prec and l > s_prec, and s
-#is such that q12 - 1 = s. Power of i is omitted.
-def ThetaExpansion(R, q_prec, s_prec, char, gradient = [0,0]):
-    q18 = R.gen(0)
-    q38 = R.gen(1)
-    #q24 is (1 + s)^(1/4), get power series expansion
-    s = R.gen(2)
-    q24 = R(0)
-    c = QQ(1)
-    d = QQ(1)/4
-    for i in range(s_prec + 1):
-        q24 += c/ZZ(i).factorial() * s ** i
-        c *= d
-        d -= 1
-    #enumerate all points (n0,n1) such that (2*n0+a0)^2 + (2*n1+a1)^2 <= n
-    nmax = ceil((sqrt(q_prec) + 1)/2)
-    all_pts = []
-    for n0 in range(-nmax, nmax + 1):
-        for n1 in range(-nmax, nmax + 1):
-            if (2*n0+ char.mu1) ** 2 + (2*n1 + char.mu2) ** 2 <= q_prec:
-                all_pts.append([n0,n1])
-    #sum
-    res = R(0)
-    for pt in all_pts:
-        n0 = pt[0]
-        n1 = pt[1]
-        term = q24 ** ((2 * n0 + char.mu1) * (2 * n1 + char.mu2))
-        term *= q18 ** ((2 * n0 + char.mu1) ** 2) * q38 ** ((2 * n1 + char.mu2) ** 2)
-        term *= (n0 + char.mu1/2) ** gradient[0] * (n1 + char.mu2/2) ** gradient[1]
-        if (n0 * char.nu1 + n1 * char.nu2) % 2 == 1:
-            term = -term
-        res += term
-    return res
-
-def RingQuotient(q_prec, s_prec):
-    A = PolynomialRing(QQ, ["q1", "q3", "s"])
-    q1 = A.gen(0)
-    q3 = A.gen(1)
-    s = A.gen(2)
-    generators = [q1 ** i * q3 ** (q_prec + 1 - i)
-                  for i in range(q_prec + 2)] + [s**(s_prec + 1)]
-    I = A.ideal(generators)
-    R = A.quotient(I, names = ["q1", "q3", "s"])
-    return R
-
-def ConvertExpansion(qexp, s_exp):
-    R = qexp.parent()
-    coeffs = qexp.coefficients()
-    exponents = qexp.exponents()
-    res = R(0)
-    q1 = R.gen(0)
-    q3 = R.gen(1)
-    s = R.gen(2)
-    for i in range(len(exponents)):
-        e = exponents[i]
-        assert e[0] % 8 == 0 and e[1] % 8 == 0
-        res += coeffs[i] * q1 ** (e[0] / 8) * q3 ** (e[1] / 8) * s ** (e[2] + s_exp)
-    return res
-
-#This is divided by s^2
-def NormalizedChi10Expansion(q_prec, s_prec):
-    R8 = RingQuotient(8 * q_prec, s_prec + 2)
-    R = RingQuotient(q_prec, s_prec)
-    even = ThetaCharacteristic.get_even_chars()
-    res = R8(1)
-    for char in even:
-        res *= ThetaExpansion(R8, 8 * q_prec, s_prec + 2, char)
-    res = QQ(2) ** (-12) * res ** 2
-    res = R(ConvertExpansion(res.lift(), -2))
-    return res
-
-#This is divided by s
-def NormalizedChi86Expansion(q_prec, s_prec):
-    R8 = RingQuotient(8 * q_prec, s_prec + 1)
-    R8x = PolynomialRing(R8, "x")
-    x = R8x.gen()
-    even = ThetaCharacteristic.get_even_chars()
-    odd = ThetaCharacteristic.get_odd_chars()
-    res = R8x(1)
-    for char in even:
-        res *= ThetaExpansion(R8, 8 * q_prec, s_prec + 1, char)
-    for char in odd:
-        res *= (ThetaExpansion(R8, 8 * q_prec, s_prec + 1, char, gradient = [1,0]) * x
-                + ThetaExpansion(R8, 8 * q_prec, s_prec + 1, char, gradient = [0,1]))
-    res *= QQ(2) ** (-6)
-
-    R = RingQuotient(q_prec, s_prec)
-    Rxy = PolynomialRing(R, ["x", "y"])
-    x = Rxy.gen(0)
-    y = Rxy.gen(1)
-    coeffs = [R(ConvertExpansion(c.lift(), -1)) for c in res.coefficients(sparse=False)]
-    res = Rxy(0)
-    for i in range(7):
-        res += coeffs[i] * x ** i * y ** (6 - i)
-    return res
 
 class ThetaCharacteristic(SageObject):
 
@@ -167,6 +71,249 @@ class ThetaCharacteristic(SageObject):
 
     def __repr__(self):
         return repr(self.mat)
+
+# Ideas for further optimization:
+# - compute all theta expansions at once
+# - store expansions to avoid recomputing them, esp. cusp expansions (only q_prec varies)
+# - use ideal (q1^n, q3^n) with less generators?
+# TODO:
+# - write documentation (EXAMPLES...)
+
+class NewChi(SageObject):
+
+    #todo: cache some expansions?
+
+    def __init__(self, k, j = 0):
+        #at the moment we only support Chi(-2,6), Chi(8,6), Chi(10,0)
+        assert [k, j] in [[-2, 6], [8, 6], [10, 0]]
+        self.weight = [k, j]
+
+    def weight(self):
+        return self.weight
+
+    def __repr__(self):
+        if self.weight == [8, 6]:
+            return "Siegel modular form chi_{8,6}"
+        elif self.weight == [10, 0]:
+            return "Siegel modular form chi_10"
+        else: # self.weight == [-2, 6]
+            return "Siegel modular function chi_{-2,6}"
+
+    ###### Helper functions for this class ######
+
+    def _theta(q18, q38, q24, q_prec, char, gradient = [0,0]):
+        #omit power of i
+        #enumerate all points (n0,n1) such that (2*n0+a0)^2 + (2*n1+a1)^2 <= q_prec
+        nmax = ceil((sqrt(q_prec) + 1)/2)
+        all_pts = []
+        for n0 in range(-nmax, nmax + 1):
+            for n1 in range(-nmax, nmax + 1):
+                if (2*n0+ char.mu1) ** 2 + (2*n1 + char.mu2) ** 2 <= q_prec:
+                    all_pts.append([n0,n1])
+        #sum
+        res = q18.parent()(0)
+        for pt in all_pts:
+            n0 = pt[0]
+            n1 = pt[1]
+            term = q24 ** ((2 * n0 + char.mu1) * (2 * n1 + char.mu2))
+            term *= q18 ** ((2 * n0 + char.mu1) ** 2) * q38 ** ((2 * n1 + char.mu2) ** 2)
+            term *= (n0 + char.mu1/2) ** gradient[0] * (n1 + char.mu2/2) ** gradient[1]
+            if (n0 * char.nu1 + n1 * char.nu2) % 2 == 1:
+                term = -term
+            res += term
+        return res
+
+    def _diag_q24(s, s_prec):
+        q24 = s.parent()(0)
+        c = QQ(1)
+        d = QQ(1)/4
+        for i in range(s_prec + 1):
+            q24 += c/ZZ(i).factorial() * s ** i
+            c *= d
+            d -= 1
+        return q24
+
+    def _diag_parent_ring(q_prec, s_prec):
+        A = PolynomialRing(QQ, ["q1", "q3", "s"])
+        q1 = A.gen(0)
+        q3 = A.gen(1)
+        s = A.gen(2)
+        generators = [q1 ** i * q3 ** (q_prec + 1 - i)
+                      for i in range(q_prec + 2)] + [s**(s_prec + 1)]
+        I = A.ideal(generators)
+        R = A.quotient(I, names = ["q1", "q3", "s"])
+        return R
+
+    def _cusp_parent_ring(q_prec):
+        A = PolynomialRing(QQ, ["q1", "q3", "q2", "q2inv"]);
+        q1 = A.gen(0)
+        q3 = A.gen(1)
+        q2 = A.gen(2)
+        q2inv = A.gen(3)
+        generators = [q1 ** i * q3 ** (q_prec + 1 - i)
+                      for i in range(q_prec + 2)] + [q2 * q2inv - 1];
+        I = A.ideal(generators)
+        R = A.quotient(I, names = ["q1", "q3", "q2", "q2inv"])
+        return R
+
+    def _diag_convert(qexp, q_shift, s_shift):
+        R = qexp.parent()
+        coeffs = qexp.coefficients()
+        exponents = qexp.exponents()
+        res = R(0)
+        q1 = R.gen(0)
+        q3 = R.gen(1)
+        s = R.gen(2)
+        for i in range(len(exponents)):
+            e = exponents[i]
+            assert e[0] % 8 == 0 and e[1] % 8 == 0
+            res += coeffs[i] * q1 ** (e[0] / 8 + q_shift) * q3 ** (e[1] / 8 + q_shift) * s ** (e[2] + s_shift)
+        return res
+
+    def _cusp_convert(qexp, q1q3_shift = 0):
+        R = qexp.parent()
+        coeffs = qexp.coefficients()
+        exponents = qexp.exponents()
+        res = R(0)
+        q1 = R.gen(0)
+        q3 = R.gen(1)
+        q2 = R.gen(2)
+        q2inv = R.gen(3)
+        for i in range(len(exponents)):
+            e = exponents[i]
+            assert e[0] % 8 == 0 and e[1] % 8 == 0 and e[2] % 4 == 0 and e[3] % 4 == 0
+            res += coeffs[i] * q1 ** (e[0] / 8 + q1q3_shift) * q3 ** (e[1] / 8 + q1q3_shift) * q2 ** (e[2] / 4) * q2inv ** (e[3] / 4)
+        return res
+
+    def _binary_sextic(R, coeffs):
+        Rxy = PolynomialRing(R, ["x", "y"])
+        x = Rxy.gen(0)
+        y = Rxy.gen(1)
+        coeffs = coeffs + [0 for i in range(7 - len(coeffs))]
+        res = Rxy(0)
+        for i in range(7):
+            res += coeffs[i] * x ** i * y ** (6 - i)
+        return res
+
+    def _cusp_div_diag(qexp, delta):
+        R = qexp.parent()
+        pol = qexp.lift()
+        A = pol.parent()
+        q2 = A.gen(2)
+        q2inv = A.gen(3)
+        d = pol.degree(q2inv)
+        pol = (q2**d * qexp).lift()
+        r = (q2 ** 2 - 2 * q2 + 1) ** delta
+        assert r.divides(pol)
+        pol = pol // r
+        return R(pol) * q2inv ** (d - delta)
+
+    ###### Main methods ######
+
+    def diagonal_expansion(self, q_prec, s_prec):
+        #divided by q1 q3 s^2 for (10,0) and q1 q3 s for (8,6)
+        q8_prec = 8 * (q_prec + 1)
+        s8_prec = s_prec + 1
+        if self.weight == [10, 0] or self.weight == [-2, 6]:
+            s8_prec += 1
+
+        R8 = NewChi._diag_parent_ring(q8_prec, s8_prec)
+        R = NewChi._diag_parent_ring(q_prec, s_prec)
+        R8x = PolynomialRing(R8, "x")
+        x = R8x.gen()
+        q18 = R8.gen(0)
+        q38 = R8.gen(1)
+        q24 = NewChi._diag_q24(R8.gen(2), s8_prec);
+        even = ThetaCharacteristic.get_even_chars()
+        odd = ThetaCharacteristic.get_odd_chars()
+
+        if self.weight == [10, 0]:
+            res = R8(1)
+            for char in even:
+                res *= NewChi._theta(q18, q38, q24, q8_prec, char)
+            res = QQ(2) ** (-12) * res ** 2
+            res = R(NewChi._diag_convert(res.lift(), -1, -2))
+            return res
+
+        elif self.weight == [8, 6]:
+            res = R8x(1)
+            for char in even:
+                res *= NewChi._theta(q18, q38, q24, q8_prec, char)
+            for char in odd:
+                res *= (NewChi._theta(q18, q38, q24, q8_prec, char, gradient = [1,0]) * x
+                        + NewChi._theta(q18, q38, q24, q8_prec, char, gradient = [0,1]))
+            res *= QQ(2) ** (-6)
+            coeffs = [R(NewChi._diag_convert(c.lift(), -1, -1))
+                      for c in res.coefficients(sparse=False)]
+            return NewChi._binary_sextic(R, coeffs)
+
+        elif self.weight == [-2, 6]: #can reuse even thetas
+            res = R8(1)
+            for char in even:
+                res *= NewChi._theta(q18, q38, q24, q8_prec, char)
+            chi10 = QQ(2) ** (-12) * res ** 2
+            chi10 = R(NewChi._diag_convert(chi10.lift(), -1, -2))
+
+            res = R8x(res)
+            q24 = NewChi._diag_q24(R8.gen(2), s8_prec - 1);
+            for char in odd:
+                res *= (NewChi._theta(q18, q38, q24, q8_prec, char, gradient = [1,0]) * x
+                        + NewChi._theta(q18, q38, q24, q8_prec, char, gradient = [0,1]))
+            res *= QQ(2) ** (-6)
+            coeffs = [R(NewChi._diag_convert(c.lift(), -1, -1))
+                      for c in res.coefficients(sparse=False)]
+            return NewChi._binary_sextic(R, coeffs) / chi10
+
+    def cusp_expansion(self, q_prec):
+        # divided by q1 q3 (q2 - 2 + q2inv) for chi10 and q1 q3 for chi86
+        q8_prec = 8 * (q_prec + 1)
+        R8 = NewChi._cusp_parent_ring(q8_prec)
+        R = NewChi._cusp_parent_ring(q_prec)
+        q18 = R8.gen(0)
+        q38 = R8.gen(1)
+        q24 = R8.gen(2)
+        R8x = PolynomialRing(R8, "x")
+        x = R8x.gen()
+        even = ThetaCharacteristic.get_even_chars()
+        odd = ThetaCharacteristic.get_odd_chars()
+
+        if self.weight == [10, 0]:
+            res = R8(1)
+            for char in even:
+                res *= NewChi._theta(q18, q38, q24, q8_prec, char)
+            res = QQ(2) ** (-12) * res ** 2
+            res = R(NewChi._cusp_convert(res.lift(), -1))
+            res = NewChi._cusp_div_diag(res, 1)
+            return res
+
+        elif self.weight == [8, 6]:
+            res = R8x(1)
+            for char in even:
+                res *= NewChi._theta(q18, q38, q24, q8_prec, char)
+            for char in odd:
+                res *= (NewChi._theta(q18, q38, q24, q8_prec, char, gradient = [1,0]) * x
+                        + NewChi._theta(q18, q38, q24, q8_prec, char, gradient = [0,1]))
+            res *= QQ(2) ** (-6)
+            coeffs = [R(NewChi._cusp_convert(c.lift(), -1))
+                      for c in res.coefficients(sparse=False)]
+            return NewChi._binary_sextic(R, coeffs)
+
+        else: # self.weight == [-2, 6]
+            res = R8(1)
+            for char in even:
+                res *= NewChi._theta(q18, q38, q24, q8_prec, char)
+            chi10 = QQ(2) ** (-12) * res ** 2
+            chi10 = R(NewChi._cusp_convert(chi10.lift(), -1))
+            chi10 = NewChi._cusp_div_diag(chi10, 1)
+
+            res = R8x(res)
+            for char in odd:
+                res *= (NewChi._theta(q18, q38, q24, q8_prec, char, gradient = [1,0]) * x
+                        + NewChi._theta(q18, q38, q24, q8_prec, char, gradient = [0,1]))
+            res *= QQ(2) ** (-6)
+            coeffs = [R(NewChi._cusp_convert(c.lift(), -1))
+                      for c in res.coefficients(sparse=False)]
+            return NewChi._binary_sextic(R, coeffs) / chi10
 
 class qExpSiegel(SageObject):
     def __init__(self, qexp, gens, base):
