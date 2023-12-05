@@ -12,7 +12,6 @@ from sage.rings.big_oh import O
 from sage.rings.number_field.number_field import QuadraticField
 from sage.functions.other import factorial
 
-
 class ThetaCharacteristic(SageObject):
 
     M2F2 = MatrixSpace(GF(2), 2)
@@ -591,5 +590,6 @@ def rat_func_sub(f, u):
 def rat_func_to_pow_ser(f):
     R = PowerSeriesRing(QQ, "u")
     return R(f.numerator())/R(f.denominator())
+
 
 
