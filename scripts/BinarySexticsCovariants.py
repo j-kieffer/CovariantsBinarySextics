@@ -290,11 +290,13 @@ class BinarySexticsCovariants(SageObject):
     def _ComputeBasisCov(self):
         LW = ListOfWeights()
         W = BinarySexticsCovariants.GetGeneratorsCov(LW, self.weight)
-        print("ComputeBasisCov: starting dimension {}".format(len(W)))
         dim = self.Dimension()
-        print("ComputeBasisCov: target dimension {}".format(dim))
-        if (dim == 0):
+        if dim == 0:
             return []
+        if len(W) == dim:
+            return [self.MakeMonomial(w) for w in W]
+        print("ComputeBasisCov: starting dimension {}, target {}".format(len(W), dim))
+
         eval_data = []
         R = PolynomialRing(QQ, ["x", "y"])
         for i in range(dim):
@@ -309,7 +311,7 @@ class BinarySexticsCovariants(SageObject):
         reduced_mat = Matrix(eval_data).change_ring(GF(p))
         basis = reduced_mat.pivot_rows()
         rk = len(basis)
-        print("ComputeBasisCov: dimension {}".format(rk))
+        print("ComputeBasisCov: found dimension {}".format(rk))
         while rk < dim:
             exp += 10
             bound += 10
@@ -320,7 +322,7 @@ class BinarySexticsCovariants(SageObject):
             p = next_prime(2**exp)
             reduced_mat = Matrix(eval_data).change_ring(GF(p))
             basis = reduced_mat.pivot_rows()
-            print("ComputeBasisCov: dimension {}".format(rk))
+            print("ComputeBasisCov: found dimension {}".format(rk))
 
         return [self.MakeMonomial(W[i]) for i in basis]
 
@@ -410,7 +412,7 @@ class BinarySexticsCovariants(SageObject):
         """
         return self._ComputeBasisCov()
 
-    def GetBasisWithConditions(self, bound = 6):
+    def GetBasisWithConditions(self):
         r"""
         Return a set of linearly independent elements in the space of covariants that is
         sufficient to generate the space of holomorphic Siegel modular forms of the
@@ -427,15 +429,14 @@ class BinarySexticsCovariants(SageObject):
         x = R.gen(0)
         y = R.gen(1)
         eval_data = []
-        nonincrease = 0
         dim = len(B)
         n = self.a - (self.b)/2
         cusp = (n % 2 == 1)
 
-        #stop if done or unlucky four times
-        while nonincrease < bound:
-            f = RandomSextic(R, 10, zeroa5a6 = True)
-            mat = RandomSL2(10)
+        print("GetBasisWithConditions: collecting data...")
+        for k in range(dim + 4):
+            f = RandomSextic(R, 100, zeroa5a6 = True)
+            mat = RandomSL2(100)
             fp = QuarticTransform(f, mat)
             basic = EvaluateBasicCovariants(f, leading_coefficient = False)
             basicp = EvaluateBasicCovariants(fp, leading_coefficient = False)
@@ -468,21 +469,9 @@ class BinarySexticsCovariants(SageObject):
                         for i in range(len(B))]
                 eval_data.append(line)
 
-            #do linear algebra
-            next_dim = dim + 1
-            while next_dim > dim:
-                p = random_prime(10000)
-                mat = Matrix(GF(p), eval_data)
-                next_dim = len(B) - mat.rank()
-
-            if next_dim < dim:
-                nonincrease = 0
-            else:
-                nonincrease += 1
-            dim = next_dim
-            print("GetBasisWithConditions: dimension {}".format(dim))
-            eval_data = [eval_data[i] for i in mat.pivot_rows()]
-
+        #do linear algebra
+        print("GetBasisWithConditions: linear algebra...")
+        mat = Matrix(QQ, eval_data)
         LCs = mat.right_kernel().basis()
         res = []
         for LC in LCs:

@@ -207,6 +207,18 @@ class NewChi(SageObject):
         pol = pol // r
         return R(pol) * q2inv ** (d - delta)
 
+    def _naive_inverse(chi):
+        lift = chi.lift()
+        c = lift.constant_coefficient()
+        assert c == 1
+        x = c - chi
+        u = x
+        res = chi.parent()(1)
+        while u != 0:
+            res += u
+            u *= x
+        return res
+
     ###### Main methods ######
 
     def diagonal_expansion(self, q_prec, s_prec):
@@ -261,7 +273,8 @@ class NewChi(SageObject):
             res *= QQ(2) ** (-6)
             coeffs = [R(NewChi._diag_convert(c.lift(), -1, -1))
                       for c in res.coefficients(sparse=False)]
-            return NewChi._binary_sextic(R, coeffs) / chi10
+            res = NewChi._binary_sextic(R, coeffs) * NewChi._naive_inverse(chi10)
+            return res
 
     def cusp_expansion(self, q_prec):
         # divided by q1 q3 (q2 - 2 + q2inv) for chi10 and q1 q3 for chi86

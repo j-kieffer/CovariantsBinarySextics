@@ -7,18 +7,27 @@ from sage.rings.infinity import infinity
 from sage.rings.rational_field import QQ
 from sage.rings.integer_ring import ZZ
 from sage.rings.polynomial.polynomial_ring_constructor import PolynomialRing
-from sage.all import NumberField, pari
+from sage.all import NumberField, pari, random_prime
 from sage.sets.set import Set
 
 from BinarySexticsCovariants import BinarySexticsCovariants as BSC
+from BinarySexticsCovariants import EvaluateBasicCovariants
 from DimFormulaSMFScalarValuedLevel1WithoutCharacter import dim_splitting_SV_All_weight
 from DimFormulaSMFVectorValuedLevel1WithoutCharacter import dim_splitting_VV_All_weight
 from DimFormulaSMFScalarValuedLevel1WithCharacter import dim_splitting_SV_All_weight_charac
 from DimFormulaSMFVectorValuedLevel1WithCharacter import dim_splitting_VV_All_weight_charac
 from FJexp import VectorFJexp, FJexp
-from ThetaFourier import Chi
+from ThetaFourier import Chi, NewChi
 from Generators_Ring_Covariants_Sextic import RingOfCovariants
 import subprocess
+
+def EvaluateCovariants(basis, chi):
+    RingCov = BSC.LCo[0].parent()
+    values = EvaluateBasicCovariants(chi)
+    subs_dict = {}
+    for i in range(26):
+        subs_dict[RingCov.gen(i)] = values[i]
+    return [b.subs(subs_dict) for b in basis]
 
 class SMF(SageObject):
     r"""
@@ -198,6 +207,57 @@ class SMF(SageObject):
         basis = [sum([b.denominator()*b[i]*basis[i] for i in range(len(basis))]) for b in ker.basis()]
         return basis, prec, s_prec
 
+    def _NewGetBasisWithPoles(basis, vanishing_order, dim):
+        if len(basis) == dim:
+            return basis
+        print("NewGetBasisWithPoles: starting dimension {}, target {}".format(len(basis), dim))
+
+        RingCov = BSC.LCo[0].parent()
+        s_prec = vanishing_order - 1
+        q_prec = 4
+        current_dim = 0
+        chi = NewChi(-2, 6).diagonal_expansion(1, 1)
+        R = chi.base_ring().cover_ring()
+        q1 = R.gen(0)
+        q3 = R.gen(1)
+        s = R.gen(2)
+
+        while current_dim < dim:
+            chi = NewChi(-2, 6).diagonal_expansion(q_prec, s_prec)
+            print("NewGetBasisWithPoles: got q-expansion of chi(-2,6) at precision {}".format(q_prec))
+            qexps = EvaluateCovariants(basis, chi)
+            qexps = [a.lift() for a in qexps]
+            print("NewGetBasisWithPoles: got q-expansion of basis elements")
+            monomials = []
+            for i in range(q_prec + 1):
+                for j in range(q_prec + 1):
+                    if i + j <= q_prec:
+                        for k in range(s_prec + 1):
+                            monomials.append([i,j,k])
+            nb = len(monomials)
+            mat = Matrix(QQ, nb, len(basis))
+            for j in range(len(basis)):
+                for i in range(nb):
+                    mat[i, j] = qexps[j].coefficient(monomials[i])
+            p = random_prime(10000)
+            try:
+                mat_p = mat.change_ring(GF(p))
+            except: #p divides some denominator, stay in QQ
+                mat_p = mat
+            current_dim = len(basis) - mat_p.rank()
+            print ("NewGetBasisWithPoles: Found dimension {} at q-precision {}".format(current_dim, q_prec))
+            q_prec += 4
+
+        ker = mat.right_kernel().basis()
+        ker = [v * v.denominator() for v in ker]
+        res = []
+        for v in ker:
+            c = RingCov(0)
+            for i in range(len(basis)):
+                c += v[i] * basis[i]
+            res.append(c)
+        return res
+
     def GetBasis(self, prec=3, taylor_prec=20):
         if (not self.basis is None and prec <= self.prec):
             return self.basis
@@ -226,6 +286,25 @@ class SMF(SageObject):
             pole_ord -= 2
 
         return self.basis
+
+    def NewGetBasis(self):
+        if not self.basis is None:
+            return self.basis
+
+        k = self.k
+        j = self.j
+        self.basis = []
+        dim = self.Dimension()
+
+        a = k + j // 2
+        vanishing_order = a
+        if not self.character:
+            basis = BSC(a, j).GetBasisWithConditions()
+        else:
+            a -= 5
+            vanishing_order -= 6
+            basis = BSC(a, j).GetBasis()
+        return SMF._NewGetBasisWithPoles(basis, vanishing_order, dim)
 
     def WriteBasisToFile(self, filename, mode):
         d = self.Dimension()
