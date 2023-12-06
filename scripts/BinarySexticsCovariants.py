@@ -129,7 +129,7 @@ def RandomSextic(R, bound, zeroa5a6 = False):
     if zeroa5a6:
         start = 2
     for i in range(start, 7):
-        f += randint(1, bound) * x ** i * y ** (6-i)
+        f += randint(-bound, bound + 1) * x ** i * y ** (6-i)
     return f
 
 def RandomSL2(bound):
@@ -463,8 +463,8 @@ class BinarySexticsCovariants(SageObject):
 
         print("GetBasisWithConditions: starting dimension {}, collecting data...".format(dim))
         for k in range(dim + 4):
-            f = RandomSextic(R, 10, zeroa5a6 = True)
-            mat = RandomSL2(100)
+            f = RandomSextic(R, 4, zeroa5a6 = True)
+            mat = RandomSL2(10)
             fp = QuarticTransform(f, mat)
             basic = EvaluateBasicCovariants(f, leading_coefficient = False)
             basicp = EvaluateBasicCovariants(fp, leading_coefficient = False)
@@ -499,15 +499,22 @@ class BinarySexticsCovariants(SageObject):
 
         #do linear algebra
         print("GetBasisWithConditions: linear algebra over Fp...")
-        p = random_prime(10000)
+        p = random_prime(10000, lbound = 5000)
         mat = Matrix(GF(p), eval_data)
         rows = mat.pivot_rows()
+        print("GetBasisWithConditions: found dimension {}".format(dim - len(rows)))
         mat = Matrix(QQ, [eval_data[i] for i in rows])
-        print("GetBasisWithConditions: linear algebra over QQ (size {} x {})...".format(len(rows),dim))
-        LCs = mat.right_kernel().basis()
-        print("GetBasisWithConditions: found dimension {}".format(len(LCs)))
+        print("GetBasisWithConditions: linear algebra over QQ (size {} x {}, height {})...".format(len(rows), dim, mat.height().global_height()))
+        ker = mat.right_kernel().basis_matrix()
+        ker = ker * ker.denominator()
+        ker = ker.change_ring(ZZ)
+        print("GetBasisWithConditions: saturation...")
+        ker = ker.saturation()
+        if dim - len(rows) > 1:
+            print("GetBasisWithConditions: lattice reduction...")
+            ker = ker.LLL()
         res = []
-        for LC in LCs:
+        for LC in ker:
             cov = 0
             for i in range(len(LC)):
                 cov += LC[i] * B[i]

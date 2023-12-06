@@ -23,14 +23,45 @@ from ThetaFourier import Chi
 from Generators_Ring_Covariants_Sextic import RingOfCovariants
 import subprocess
 
-def EvaluateCovariants(basis, chi, leading_coefficient = True):
+#this assumes that mat has full rank
+#turns out this is slow... at least small primes won't work
+def KernelVectors(mat):
+    mat = mat * mat.denominator()
+    exp = 10
+    N = 1
+    while True:
+        exp *= 2
+        N = random_prime(2**exp, lbound = 2**(exp - 1))
+        print("KernelVectors: choose {}-bit prime number as modulus", exp)
+        mat_mod = mat.change_ring(ZZ.quotient(N))
+        ker_mod = mat_mod.right_kernel().echelonized_basis_matrix()
+        a, b = ker_mod.dimensions()
+        if (a, b) != mat.dimensions(): #kernel too large
+            continue
+        ker = Matrix(QQ, a, b)
+        try:
+            for i in range(a):
+                for j in range(b):
+                    ker[i,j] = ker_mod[i,j].rational_reconstruction()
+        except ArithmeticError:
+            continue
+        if mat * ker.transpose() == 0:
+            break
+
+    ker = ker * ker.denominator()
+    if b - a > 1:
+        print("KernelVectors: lattice reduction")
+        ker = ker.LLL()
+    return ker
+
+def EvaluateCovariants(basis, chi):
     RingCov = RingOfCovariants()
     R = chi.base_ring()
-    if not leading_coefficient:
-        R = PolynomialRing(R, "x")
+    S = R.cover_ring()
+    Rx = PolynomialRing(R, "x")
 
     print("EvaluateCovariants: computing transvectants...")
-    values = EvaluateBasicCovariants(chi, leading_coefficient = leading_coefficient)
+    values = EvaluateBasicCovariants(chi, leading_coefficient = False)
     subs_dict = {}
     for i in range(26):
         subs_dict[RingCov.gen(i)] = values[i]
@@ -41,18 +72,28 @@ def EvaluateCovariants(basis, chi, leading_coefficient = True):
 
     print("EvaluateCovariants: substitution in {} monomials...".format(len(monomials)))
     subs_mon = {}
+    j = 0
     for m in monomials:
-        subs_mon[m] = m.subs(subs_dict)
+        subs_mon[m] = m.subs(subs_dict).coefficients(sparse = False)
+        subs_mon[m] = [c.lift() for c in subs_mon[m]]
+        j = max(j, len(subs_mon[m]))
 
-    print("EvaluateCovariants: linear combinations...")
+    #padding in case leading coefficients are zero
+    for m in monomials:
+        subs_mon[m] = subs_mon[m] + [S(0) for i in range(j + 1 - len(subs_mon[m]))]
+
+    print("EvaluateCovariants: making {} linear combinations...".format(len(basis)))
     res = []
     for b in basis:
-        c = R(0)
+        r = []
         mons = b.monomials()
         coeffs = b.coefficients()
-        for i in range(len(mons)):
-            c += coeffs[i] * subs_mon[mons[i]]
-        res.append(c)
+        for k in range(j + 1):
+            c = S(0)
+            for i in range(len(mons)):
+                c += coeffs[i] * subs_mon[mons[i]][k]
+            r.append(R(c))
+        res.append(Rx(r))
     return res
 
 class SMF(SageObject):
@@ -253,9 +294,8 @@ class SMF(SageObject):
         while current_dim > dim:
             chi = Chi(-2, 6).diagonal_expansion(q_prec, s_prec)
             print("GetBasis: looking for vanishing at order {} along diagonal".format(vanishing_order))
-            print("GetBasis: got q-expansion of chi(-2,6) at precision {}".format(q_prec))
-            qexps = EvaluateCovariants(basis, chi, leading_coefficient = False)
-            print("GetBasis: got q-expansion of basis elements")
+            print("GetBasis: got q-expansion of chi(-2,6) at q-precision {}".format(q_prec))
+            qexps = EvaluateCovariants(basis, chi)
             monomials = []
             for i in range(q_prec + 1):
                 for j in range(q_prec + 1):
@@ -264,7 +304,7 @@ class SMF(SageObject):
                             monomials.append([[i,j,k], l])
             nb = len(monomials)
             mat = Matrix(QQ, nb, len(basis))
-            print("GetBasis: building matrix (size {} x {})".format(nb, len(basis)))
+            print("GetBasis: linear algebra over Fp (size {} x {})...".format(nb, len(basis)))
             for j in range(len(basis)):
                 coeffs = qexps[j].coefficients(sparse = False)
                 coeffs = [c.lift() for c in coeffs]
@@ -272,20 +312,25 @@ class SMF(SageObject):
                 for i in range(nb):
                     e, l = monomials[i]
                     mat[i, j] = coeffs[l].coefficient(e)
-            p = random_prime(10000)
-            print("GetBasis: linear algebra...")
+            p = random_prime(1000000, lbound = 500000)
             mat = mat * mat.denominator()
             mat = mat.change_ring(ZZ)
             mat_p = mat.change_ring(GF(p))
             current_dim = len(basis) - mat_p.rank()
             print ("GetBasis: found dimension {} at q-precision {}".format(current_dim, q_prec))
             rows = mat_p.pivot_rows()
-            mat = Matrix([mat.row(i) for i in rows])
-            q_prec = ceil(1.3 * q_prec + 2)
+            mat = Matrix(QQ, [mat.row(i) for i in rows])
+            q_prec = ceil(1.3 * q_prec + 1)
 
+        print("GetBasis: linear algebra over QQ (size {} x {}, height {})...".format(len(rows), len(basis), mat.height().global_height()))
         ker = mat.right_kernel().basis_matrix()
-        print("GetBasis: lattice reduction...")
-        ker = ker.LLL()
+        ker = ker * ker.denominator()
+        ker = ker.change_ring(ZZ)
+        print("GetBasis: saturation...")
+        ker = ker.saturation()
+        if dim > 1:
+            print("GetBasis: lattice reduction...")
+            ker = ker.LLL()
         res = []
         for v in ker:
             c = RingCov(0)
