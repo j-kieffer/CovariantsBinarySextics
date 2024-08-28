@@ -31,7 +31,7 @@ def dimension_new_cusp_forms_plus_level_2(k):
     """
     k = ZZ(k)
 
-    if k==0 or k==2:
+    if k==0: # or k==2:
         return ZZ(0)
 
     if (k % 8) == 0:

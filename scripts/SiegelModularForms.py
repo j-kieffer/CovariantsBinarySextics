@@ -274,11 +274,14 @@ class SMF(SageObject):
     #     basis = [sum([b.denominator()*b[i]*basis[i] for i in range(len(basis))]) for b in ker.basis()]
     #     return basis, prec, s_prec
 
-    def _GetBasis(basis, vanishing_order, dim, vecj):
-        if len(basis) == dim:
-            return basis
-        if dim == 0:
-            return []
+    def _GetBasis(basis, vanishing_order, dim, vecj, keq2 = False):
+        # When k == 2 we don't know the dimension is 0, and want to verify it.
+        if not keq2:
+            if len(basis) == dim:
+                return basis
+            if (dim == 0):
+                return []
+            
         print("GetBasis: starting dimension {}, target {}".format(len(basis), dim))
 
         RingCov = RingOfCovariants()
@@ -379,7 +382,7 @@ class SMF(SageObject):
         j = self.j
         self.basis = []
         dim = self.Dimension()
-        if dim == 0:
+        if (k != 2) and (dim == 0):
             return []
 
         a = k + j // 2
@@ -390,7 +393,7 @@ class SMF(SageObject):
             a -= 5
             vanishing_order -= 6
             basis = BSC(a, j).GetBasis()
-        return SMF._GetBasis(basis, vanishing_order, dim, j)
+        return SMF._GetBasis(basis, vanishing_order, dim, j, (k == 2))
 
     def WriteBasisToFile(self, filename, mode):
         d = self.Dimension()
