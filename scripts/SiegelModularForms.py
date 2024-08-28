@@ -293,6 +293,8 @@ class SMF(SageObject):
         q1 = R.gen(0)
         q3 = R.gen(1)
         s = R.gen(2)
+        rows = []
+        mat = Matrix(QQ, rows)
 
         while current_dim > dim:
             chi = Chi(-2, 6).diagonal_expansion(q_prec, s_prec)
@@ -324,7 +326,7 @@ class SMF(SageObject):
             rows = mat_p.pivot_rows()
             mat = Matrix(QQ, [mat.row(i) for i in rows])
             q_prec = ceil(1.3 * q_prec + 1)
-
+        
         print("GetBasis: linear algebra over QQ (size {} x {}, height {})...".format(len(rows), len(basis), mat.height().global_height()))
         ker = mat.right_kernel().basis_matrix()
         ker = ker * ker.denominator()
