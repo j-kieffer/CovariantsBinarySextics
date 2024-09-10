@@ -152,8 +152,8 @@ def dim_splitting_VV_All_weight_charac(k,j):
 
 
     elif k == 2 :
-        if j > 31:
-                  raise ValueError("we do not know")
+#        if j > 31:
+#                  raise ValueError("we do not know")
         return {
                 'degree': 2,
                 'family': 'S',
