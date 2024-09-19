@@ -352,6 +352,134 @@ class BinarySexticsCovariants(SageObject):
 
         return [self.MakeMonomial(W[i]) for i in basis]
 
+    #Use the alternative strategy of dividing out by f^n
+    def _ComputeBasisCov2(self, n = 0, B = []):
+        print("ComputeBasisCov2: trying n = {}".format(n))
+
+        #Get generators for weight (a + n, b + 6n)
+        LW = [(1,6), (2,0), (2,4), (2,8), (3,8), (3,12)]
+        W = BinarySexticsCovariants.GetGeneratorsCov(LW, (self.a + n, self.b + 6 * n))
+        W = [w[0:4] + [0, 0] + w[4:6] + [0 for i in range(8, 26)] for w in W]
+
+        if len(B) == 0:
+            #filter out elements that are multiples of f^n
+            for i in range(len(W)):
+                if W[i][0] >= n:
+                    B.append([0 for k in range(i)] + [1] + [0 for k in range(len(W) - 1 - i)])
+        else:
+            #in W, the elements with a low power of f come first, so we just need to pad
+            #the input kernel elements with zeroes.
+            l = len(B[0])
+            B = [[0: k in range(len(W) - l)] + b for b in B]
+
+        target_dim = self.Dimension() - len(B)
+        ambient_dim = len(W) - len(B)
+        print("Got ambient vector space of dimension {}, target: {}. Entering linear algebra...".format(ambient_dim, target_dim))
+        proj = Matrix(B).right_kernel().matrix()
+
+        #with the remaining monomials, make linear combinations that are divisible by f^n
+        P = PolynomialRing(QQ, 'a0')
+        a0 = P.gen()
+        P = P.quo(a0**n)
+        a0 = P.gen() #now in the quotient
+        eval_data = []
+        R = PolynomialRing(P, ["x","y"])
+        x = R.gen(0)
+        y = R.gen(1)
+        nb = max(0, (ambient_dim - target_dim)//n) + 10
+        bound = 10
+
+        for i in range(nb): #add some extra evaluation points to improve chances
+            f = RandomSextic(R, bound) #integral coefficients
+            c0 = f.coefficient({x:6,y:0})
+            f = f - c0*x**6 + a0*x**6 #set first coefficient to a0
+            basic = EvaluateBasicCovariants(f) #todo: special function for 6 generators only
+            polys = [EvaluateMonomialInCovariants(w, basic).lift() for w in monomials_linalg]
+            for j in range(n):
+                line = []
+                for p in polys:
+                    if p.degree() >= j:
+                        line.append(p.list()[j])
+                    else:
+                        line.append(0)
+                eval_data.append(line)
+
+        p = next_prime(10 * n * nb)
+        pivot = (Matrix(eval_data).change_ring(GF(p)) * proj.change_ring(GF(p))).pivot_rows()
+        eval_data = [eval_data[i] for i in pivot]
+        ker_rank = ambient_dim - len(pivot)
+        print("With {} evaluation points, p = {}: found rank {}, target: {}".format(nb, p, ker_rank, target_dim))
+        prev_ker_rank = ker_rank + 1
+
+        while prev_ker_rank != ker_rank: #add new evaluation points
+            bound += 10
+            nb += 10
+            for i in range(10): #same as above.
+                f = RandomSextic(R, bound)
+                c0 = f.coefficient({x:6,y:0})
+                f = f - c0*x**6 + a0*x**6
+                basic = EvaluateBasicCovariants(f)
+                polys = [EvaluateMonomialInCovariants(w, basic).lift() for w in monomials_linalg]
+                for j in range(n):
+                    line = []
+                    for p in polys:
+                        if p.degree() >= j:
+                            line.append(p.list()[j])
+                        else:
+                            line.append(0)
+                    eval_data.append(line)
+
+            p = next_prime(10 * n * nb)
+            pivot = (Matrix(eval_data).change_ring(GF(p)) * proj.change_ring(GF(p))).pivot_rows()
+            eval_data = [eval_data[i] for i in pivot]
+            prev_ker_rank = ker_rank
+            ker_rank = ambient_dim - len(pivot)
+            print("With {} evaluation points, p = {}: found rank {}, target: {}".format(nb, p, ker_rank, target_dim))
+
+        #get kernel basis over QQ
+        print("ComputeBasisCov2: Linear algebra over QQ (dimensions {} x {})...".format(len(eval_data), len(monomials_linalg)))
+        ker_basis = (Matrix(eval_data) * proj).right_kernel().basis()
+
+        #attempt to certify result and append to B
+        print("ComputeBasisCov2: Certification step...")
+        #get leading coefficients without powers of x and evaluate monomials
+        LCov = BinarySexticsCovariants.LCov
+        y = LCov[0].parent().gens()[1]
+        basic_leading_coeffs = [LCov[i].coefficient({y:0}).coefficients()[0] for i in range(26)]
+        a0 = basic_leading_coeffs[0]
+        leading_coeffs = [EvaluateMonomialInCovariants(w, basic_leading_coeffs) for w in W]
+        f = BinarySexticsCovariants.LCo[0]
+
+        for b in ker_basis:
+            #transform b in element of length len(W)
+            c = proj.solve_left(b)
+            poly = 0
+            for j in range(len(W)):
+                if c[j] != 0:
+                    poly += c[j] * leading_coeffs[j]
+            poly_ok = True
+            for e in poly.exponents():
+                if e[0] < n:
+                    poly_ok = False
+                    break
+            if poly_ok:
+                B.append(c)
+
+        if len(B) == target_dim:
+            #We found everything, write elements of B as covariants
+            res = []
+            for c in B:
+                elt = 0
+                for j in range(len(W)):
+                    if c[j] != 0:
+                        elt += c[j] * self.MakeMonomial(W[j])
+                elt = elt / elt.content()
+                res.append(elt / f^n)
+            return res
+        else:
+            #Some covariants are missing, increase n
+            return self._ComputeBasisCov2(n + 2, B)
+
     def _ComputeBasisAndRelationsCovOld(self):
         print("    Getting generators of covariants...")
         W = BinarySexticsCovariants.GetGeneratorsCov(BinarySexticsCovariants.LW, self.weight)
