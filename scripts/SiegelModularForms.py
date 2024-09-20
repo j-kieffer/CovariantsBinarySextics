@@ -308,6 +308,14 @@ class SMF(SageObject):
             print("GetBasis: looking for vanishing at order {} along diagonal".format(vanishing_order))
             print("GetBasis: got q-expansion of chi(-2,6) at q-precision {}".format(q_prec))
             qexps = EvaluateCovariants(basis, chi)
+            monomials = []
+            for i in range(q_prec + 1):
+                for j in range(q_prec + 1):
+                    for k in range(s_prec + 1):
+                        for l in range(vecj + 1):
+                            monomials.append([[i,j,k], l])
+            nb = len(monomials)
+            mat = Matrix(QQ, nb, len(basis))
             print("GetBasis: linear algebra over Fp (size {} x {})...".format(nb, len(basis)))
             for j in range(len(basis)):
                 coeffs = qexps[j].coefficients(sparse = False)
@@ -325,14 +333,7 @@ class SMF(SageObject):
             rows = mat_p.pivot_rows()
             mat = Matrix(QQ, [mat.row(i) for i in rows])
             q_prec = ceil(1.3 * q_prec + 1)
-            monomials = []
-            for i in range(q_prec + 1):
-                for j in range(q_prec + 1):
-                    for k in range(s_prec + 1):
-                        for l in range(vecj + 1):
-                            monomials.append([[i,j,k], l])
-            nb = len(monomials)
-            mat = Matrix(QQ, nb, len(basis))
+ 
         
         print("GetBasis: linear algebra over QQ (size {} x {}, height {})...".format(mat.nrows(), len(basis), mat.height().global_height()))
         ker = mat.right_kernel().basis_matrix()
