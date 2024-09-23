@@ -189,6 +189,27 @@ class BinarySexticsCovariants(SageObject):
     """
 
     LW, LCo, LCov, DCov = GetRingGeneratorsCov()
+    #in each of Stroh's syzygies, add the largest monomial in the lex order
+    #with respect to the ordering of LW.
+    #Stroh's variables are (up to scaling):
+    #0     3    2    1    7     6    5    4    11    10   9     8    14   13
+    #f     H    i    A    T     q    p    l    r     s    Delta B    t    u
+    #Co16  Co28 Co24 Co20 Co312 Co38 Co36 Co32 Co410 Co46 Co44  Co40 Co58 Co54
+    #12   16    17    15   19   18   20   21   23    22    24     25
+    #m    v     w     C    pi   n    nu   rho  mu    D     lambda R
+    #Co52 Co661 Co662 Co60 Co74 Co72 Co82 Co94 Co102 Co100 Co122  Co150
+    #We index the elements of SyzygousMonomials by the largest j such that LCo[j]
+    #appears in the monomial.
+    SyzygousMonomials = {7: [LCo[7]**2, LCo[7] * LCo[6], LCo[5] * LCo[7], LCo[4] * LCo[7]],
+                         6: [LCo[6] * LCo[3], LCo[6]**2, LCo[6] * LCo[4]],
+                         5: [LCo[5]**2, LCo[5] * LCo[4]],
+                         10: [LCo[6] * LCo[10]],
+                         9: [LCo[6] * LCo[9], LCo[9]**2],
+                         8: [LCo[5] * LCo[8]],
+                         12: [LCo[6] * LCo[12], LCo[10] * LCo[12], LCo[9] * LCo[12]],
+                         18: [LCo[6] * LCo[18], LCo[10] * LCo[18], LCo[17] * LCo[18]],
+                         24: [LCo[9] * LCo[24]]
+                         }
 
     # Verifying the expression for C_{2,0}
     assert LCo[1].parent().variable_names()[1] == 'Co20'
@@ -259,6 +280,35 @@ class BinarySexticsCovariants(SageObject):
         all_ws = []
         for w0 in range(max_w0+1):
             ws = BinarySexticsCovariants.GetGeneratorsCov(weight_list[1:], (wt[0]-w0*wt0[0], wt[1]-w0*wt0[1]))
+            all_ws += [[w0] + w for w in ws]
+        return all_ws
+
+    #this outputs generators in the lexicographic order.
+    def GetGeneratorsCov2(weight_list, wt, cur = []):
+        if (len(weight_list) == 0):
+            if (wt == (0,0)):
+                return [[]]
+            else:
+                return []
+        wt0 = weight_list[0]
+        assert not ((wt0[0] == 0) and (wt0[1] == 0))
+        max_w0 = min([wt[i] // wt0[i] for i in range(2) if wt0[i] != 0])
+        #adjust max_w0 given the list of syzygous monomials.
+        monomials = BinarySexticsCovariants.SyzygousMonomials.get(len(cur))
+        if not monomials is None:
+            for m in monomials:
+                d = m.degrees()
+                assert d[len(cur)] > 0
+                ok = True
+                for i in range(len(cur)):
+                    if d[i] > cur[i]:
+                        ok = False
+                        break
+                if ok:
+                    max_w0 = min(max_w0, d[len(cur)] - 1)
+        all_ws = []
+        for w0 in range(max_w0, -1, -1):
+            ws = BinarySexticsCovariants.GetGeneratorsCov2(weight_list[1:], (wt[0]-w0*wt0[0], wt[1]-w0*wt0[1]), cur + [w0])
             all_ws += [[w0] + w for w in ws]
         return all_ws
 
@@ -672,7 +722,7 @@ class BinarySexticsCovariants(SageObject):
 
     def _ComputeBasisCov5(self):
         LW = ListOfWeights()
-        W = BinarySexticsCovariants.GetGeneratorsCov(LW, self.weight)
+        W = BinarySexticsCovariants.GetGeneratorsCov2(LW, self.weight)
         dim = self.Dimension()
         if dim == 0:
             return []
@@ -703,7 +753,25 @@ class BinarySexticsCovariants(SageObject):
             rk = len(basis)
             print("ComputeBasisCov: found dimension {}".format(rk))
 
-        return [self.MakeMonomial(W[i]) for i in basis]
+        res = []
+        syzygous = []
+        for i in range(len(W)):
+            monomial = self.MakeMonomial(W[i])
+            if i in basis:
+                res.append(monomial)
+            else:
+                syzygous.append(monomial)
+                #get last nonzero entry
+                j = 0
+                for k in range(26):
+                    if W[i][k] > 0:
+                        j = k
+                if j in BinarySexticsCovariants.SyzygousMonomials.keys():
+                    BinarySexticsCovariants.SyzygousMonomials[j].append(monomial)
+                else:
+                    BinarySexticsCovariants.SyzygousMonomials[j] = [monomial]
+        print("ComputeBasisCov: found syzygous monomials {}".format(syzygous))
+        return res
 
 
     def _ComputeBasisAndRelationsCovOld(self):
