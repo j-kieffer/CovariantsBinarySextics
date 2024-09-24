@@ -5,7 +5,7 @@ This file contains functions to compute a basis for the space of covariants of b
 ## imports
 from functools import reduce
 from sage.structure.sage_object import SageObject
-from sage.all import Matrix, Partitions, ZZ, QQ, prod, Set, PolynomialRing, random_prime
+from sage.all import Matrix, Partitions, ZZ, QQ, prod, Set, PolynomialRing, random_prime, ceil
 from sage.combinat.q_analogues import q_multinomial
 from sage.combinat.q_analogues import q_binomial
 from sage.combinat.integer_vector_weighted import WeightedIntegerVectors
@@ -15,15 +15,9 @@ from sage.rings.invariants.invariant_theory import AlgebraicForm, transvectant
 from sage.arith.misc import next_prime
 from sage.rings.finite_rings.finite_field_constructor import GF
 
-def ListOfWeights():
-    return [(1, 6), (2, 0), (2, 4), (2, 8), (3, 2), (3, 6), (3, 8), (3, 12),
-            (4, 0), (4, 4), (4, 6), (4, 10), (5, 2), (5, 4), (5, 8), (6, 0),
-            (6, 6), (6, 6), (7, 2), (7, 4), (8, 2), (9, 4), (10, 0), (10, 2),
-            (12, 2), (15, 0)]
-
 # Only leading coefficients by default, otherwise all coefficients
 def EvaluateBasicCovariants(sextic, leading_coefficient = True):
-    LW = ListOfWeights()
+    LW = BinarySexticsCovariants.LW
     R = sextic.base_ring()
     C = {}
     f = AlgebraicForm(2, 6, sextic)
@@ -100,7 +94,7 @@ def EvaluateBasicCovariants(sextic, leading_coefficient = True):
             C[k] = Rx(coeffs)
 
     res = [C[wt] for wt in LW]
-    res[17] = C[(6,6,2)]
+    res[LW.index((6,6)) + 1] = C[(6,6,2)]
     for k in range(26):
         res[k] *= cofactors[k]
     return res
@@ -110,6 +104,35 @@ def EvaluateMonomialInCovariants(wt, basic):
     res = R(1)
     for i in range(26):
         res *= basic[i] ** wt[i]
+    return res
+
+def EvaluateMonomialsInCovariants(wts, basic_list):
+    nb = len(basic_list)
+    if nb == 0:
+        return []
+    R = basic_list[0][0].parent()
+    degrees = [0 for i in range(26)]
+    for i in range(26):
+        #find out the largest degree of LCo[i] appearing in wts.
+        for w in wts:
+            degrees[i] = max(degrees[i], w[i])
+    res = []
+    for basic in basic_list:
+        powers = [[] for i in range(26)]
+        #compute powers
+        for i in range(26):
+            x = R(1)
+            for j in range(degrees[i] + 1):
+                powers[i].append(x)
+                if j < degrees[i]:
+                    x *= basic[i]
+        #compute monomials
+        ev = [R(1) for w in wts]
+        for j in range(len(wts)):
+            for i in range(26):
+                if wts[j][i] > 0:
+                    ev[j] *= powers[i][wts[j][i]]
+        res.append(ev)
     return res
 
 #this is just for testing.
@@ -188,33 +211,52 @@ class BinarySexticsCovariants(SageObject):
 
     """
 
-    LW, LCo, LCov, DCov = GetRingGeneratorsCov()
+    new_ordering = True
+    LW, LCo, LCov, DCov = GetRingGeneratorsCov(new_ordering = new_ordering)
     #in each of Stroh's syzygies, add the largest monomial in the lex order
     #with respect to the ordering of LW.
-    #Stroh's variables are (up to scaling):
+    #Stroh's variables are (up to scaling, with old and new ordering):
     #0     3    2    1    7     6    5    4    11    10   9     8    14   13
+    #0     1    5    21   2     3    6    13   4     8    9     22   7    12
     #f     H    i    A    T     q    p    l    r     s    Delta B    t    u
     #Co16  Co28 Co24 Co20 Co312 Co38 Co36 Co32 Co410 Co46 Co44  Co40 Co58 Co54
     #12   16    17    15   19   18   20   21   23    22    24     25
+    #16   10    11    23   14   17   18   15   19    24    20     25
     #m    v     w     C    pi   n    nu   rho  mu    D     lambda R
     #Co52 Co661 Co662 Co60 Co74 Co72 Co82 Co94 Co102 Co100 Co122  Co150
     #We index the elements of SyzygousMonomials by the largest j such that LCo[j]
     #appears in the monomial.
-    SyzygousMonomials = {7: [LCo[7]**2, LCo[7] * LCo[6], LCo[5] * LCo[7], LCo[4] * LCo[7]],
-                         6: [LCo[6] * LCo[3], LCo[6]**2, LCo[6] * LCo[4]],
-                         5: [LCo[5]**2, LCo[5] * LCo[4]],
-                         10: [LCo[6] * LCo[10]],
-                         9: [LCo[6] * LCo[9], LCo[9]**2],
-                         8: [LCo[5] * LCo[8]],
-                         12: [LCo[6] * LCo[12], LCo[10] * LCo[12], LCo[9] * LCo[12]],
-                         18: [LCo[6] * LCo[18], LCo[10] * LCo[18], LCo[17] * LCo[18]],
-                         24: [LCo[9] * LCo[24]]
-                         }
+    SyzygousMonomials = {
+        2: [LCo[2]**2], #S1
+        3: [LCo[2] * LCo[3], LCo[3]**2], #S2, S5
+        5: [LCo[2] * LCo[5]], #S3
+        6: [LCo[2] * LCo[6], LCo[6]**2], #S4, S6
+        7: [LCo[5] * LCo[7]], #S11
+        8: [LCo[5] * LCo[8], LCo[6] * LCo[8]], #S8, S10
+        9: [LCo[9]**2], #S14
+        11: [LCo[5] * LCo[11]], #S13
+        13: [LCo[2] * LCo[13], LCo[6] * LCo[13], LCo[9] * LCo[13], LCo[11] * LCo[13],
+             LCo[5] * LCo[12] * LCo[13], LCo[12] * LCo[13]**2], #S7, S9, S12, S15, S16, S17
+        16: [LCo[9] * LCo[16], LCo[12] * LCo[13] * LCo[16]], #S18, S19
+        18: [LCo[13] * LCo[16] * LCo[18]] #S20
+    }
+    SyzygousDegrees = [(6, 6)]
+    # SyzygousMonomials = {7: [LCo[7]**2, LCo[7] * LCo[6], LCo[5] * LCo[7], LCo[4] * LCo[7]],
+    #                      6: [LCo[6] * LCo[3], LCo[6]**2, LCo[6] * LCo[4]],
+    #                      5: [LCo[5]**2, LCo[5] * LCo[4]],
+    #                      10: [LCo[6] * LCo[10]],
+    #                      9: [LCo[6] * LCo[9], LCo[9]**2],
+    #                      8: [LCo[5] * LCo[8]],
+    #                      12: [LCo[6] * LCo[12], LCo[10] * LCo[12], LCo[9] * LCo[12]],
+    #                      18: [LCo[6] * LCo[18], LCo[10] * LCo[18], LCo[17] * LCo[18]],
+    #                      24: [LCo[9] * LCo[24]]
+    #                      }
 
     # Verifying the expression for C_{2,0}
-    assert LCo[1].parent().variable_names()[1] == 'Co20'
-    a = LCov[1].base_ring().gens()
-    assert LCov[1] == -3*a[3]**2 + 8*a[2]*a[4] - 20*a[1]*a[5] + 120*a[0]*a[6]
+    if not new_ordering:
+        assert LCo[1].parent().variable_names()[1] == 'Co20'
+        a = LCov[1].base_ring().gens()
+        assert LCov[1] == -3*a[3]**2 + 8*a[2]*a[4] - 20*a[1]*a[5] + 120*a[0]*a[6]
 
     def __init__(self, a, b):
         self.a = a
@@ -312,6 +354,58 @@ class BinarySexticsCovariants(SageObject):
             all_ws += [[w0] + w for w in ws]
         return all_ws
 
+    def GetGeneratorsCov3(weight_list, wt, syzygous = None):
+        if syzygous is None:
+            syzygous = {}
+            for n in BinarySexticsCovariants.SyzygousMonomials.keys():
+                syzygous[n] = [m.degrees() for m in BinarySexticsCovariants.SyzygousMonomials[n]]
+        index = 26 - len(weight_list)
+
+        #Early abort cases
+        if wt[0] < 0 or wt[1] < 0 or wt[1] > 6 * wt[0]:
+            return []
+        elif wt[0] == 0 and wt[1] == 0:
+            return [[0 for i in range(len(weight_list))]]
+        elif wt[0] == 0:
+            return []
+        elif len(weight_list) == 0:
+            return []
+        elif len(weight_list) <= 5 and wt[1] > 0: #no vector-valued covariants left
+            return []
+        elif len(weight_list) <= 8 and wt[0] % 2 == 1 and wt[0] < 15: #only R has an odd a
+            return []
+
+        #Compute min_w0, max_w0
+        wt0 = weight_list[0]
+        max_w0 = min([wt[i] // wt0[i] for i in range(2) if wt0[i] != 0])
+        min_w0 = 0
+        if wt0[1] > 0:
+            slope = ZZ(weight_list[1][1]) / ZZ(weight_list[1][0])
+            assert wt0[1] - slope * wt0[0] >= 0
+            if wt[1] - slope * wt[0] > 0:
+                if wt0[1] - slope * wt0[0] == 0:
+                    return []
+                else:
+                    min_w0 = ceil((wt[1] - slope * wt[0])/(wt0[1] - slope * wt0[0]))
+
+        #adjust max_w0 given the list of syzygous monomials.
+        degrees = syzygous.get(index)
+        if not degrees is None:
+            for d in degrees:
+                max_w0 = min(max_w0, d[index] - 1)
+
+        all_ws = []
+        for w0 in range(max_w0, min_w0 - 1, -1):
+            new_syzygous = {}
+            #ignore monomials whose degree in the current covariant is more than w0.
+            for n in syzygous:
+                if n > index:
+                    new_syzygous[n] = [d for d in syzygous[n] if d[index] <= w0]
+            ws = BinarySexticsCovariants.GetGeneratorsCov3(weight_list[1:], (wt[0]-w0*wt0[0], wt[1]-w0*wt0[1]),
+                                                           new_syzygous)
+            all_ws += [[w0] + w for w in ws]
+        return all_ws
+
     def MakeMonomial(self, wt):
         res = 1
         for i in range(26):
@@ -347,7 +441,7 @@ class BinarySexticsCovariants(SageObject):
         r"""
         Computes the basis and relations for both of the following functions
         """
-        LW = ListOfWeights()
+        LW = BinarySexticsCovariants.LW
         W = BinarySexticsCovariants.GetGeneratorsCov(LW, self.weight)
         dim = self.Dimension()
         if (dim == 0):
@@ -383,7 +477,7 @@ class BinarySexticsCovariants(SageObject):
 
     # Use a finite field instead
     def _ComputeBasisCov(self):
-        LW = ListOfWeights()
+        LW = BinarySexticsCovariants.LW
         W = BinarySexticsCovariants.GetGeneratorsCov(LW, self.weight)
         dim = self.Dimension()
         if dim == 0:
@@ -679,7 +773,7 @@ class BinarySexticsCovariants(SageObject):
         return B
 
     def _ComputeBasisCov4(self):
-        LW = ListOfWeights()
+        LW = BinarySexticsCovariants.LW
         dim = self.Dimension()
         if dim == 0:
             return []
@@ -720,9 +814,9 @@ class BinarySexticsCovariants(SageObject):
 
         return [self.MakeMonomial(w) for w in W]
 
-    def _ComputeBasisCov5(self):
-        LW = ListOfWeights()
-        W = BinarySexticsCovariants.GetGeneratorsCov2(LW, self.weight)
+    def _ComputeBasisCov5(self, data = {}):
+        LW = BinarySexticsCovariants.LW
+        W = BinarySexticsCovariants.GetGeneratorsCov3(LW, self.weight)
         dim = self.Dimension()
         if dim == 0:
             return []
@@ -730,37 +824,38 @@ class BinarySexticsCovariants(SageObject):
             return [self.MakeMonomial(w) for w in W]
         print("ComputeBasisCov: starting dimension {}, target {}".format(len(W), dim))
 
-        R = PolynomialRing(QQ, ["x", "y"])
         basic = []
-        bound = 10
-        for i in range(dim):
-            f = RandomSextic(R, bound)
-            basic.append(EvaluateBasicCovariants(f))
+        nb = 0
         rk = 0
         p = 101
 
         while rk < dim:
-            bound += 2
-            f = RandomSextic(R, bound)
-            basic.append(EvaluateBasicCovariants(f))
-            p = next_prime(p)
+            nb += (dim - rk + 10)
             F = GF(p)
-            basic_red = [[F(i) for i in v] for v in basic]
-            print("ComputeBasisCov: p = {}, making monomials...".format(p))
-            eval_data = [[EvaluateMonomialInCovariants(wt, v) for wt in W] for v in basic_red]
+            R = PolynomialRing(F, "x, y")
+            print("ComputeBasisCov: collecting covariants in GF({})...".format(p))
+            basic = []
+            if not p in data.keys():
+                data[p] = []
+            for i in range(nb - len(data[p])):
+                data[p].append(EvaluateBasicCovariants(RandomSextic(R, p)))
+
+            print("ComputeBasisCov: making monomials...".format(p))
+            eval_data = EvaluateMonomialsInCovariants(W, data[p])
             print("ComputeBasisCov: linear algebra...")
             basis = Matrix(eval_data).transpose().pivot_rows()
             rk = len(basis)
             print("ComputeBasisCov: found dimension {}".format(rk))
+            p = next_prime(p)
 
         res = []
-        syzygous = []
+        syzygous = 0
         for i in range(len(W)):
             monomial = self.MakeMonomial(W[i])
             if i in basis:
                 res.append(monomial)
             else:
-                syzygous.append(monomial)
+                syzygous += 1
                 #get last nonzero entry
                 j = 0
                 for k in range(26):
@@ -770,9 +865,26 @@ class BinarySexticsCovariants(SageObject):
                     BinarySexticsCovariants.SyzygousMonomials[j].append(monomial)
                 else:
                     BinarySexticsCovariants.SyzygousMonomials[j] = [monomial]
-        print("ComputeBasisCov: found syzygous monomials {}".format(syzygous))
+        print("ComputeBasisCov: found {} syzygous monomials".format(syzygous))
+        BinarySexticsCovariants.SyzygousDegrees.append((self.a, self.b))
         return res
 
+    def _ComputeBasisCov6(self):
+        a = self.a
+        b = self.b
+        kmax = min(a, b // 2) - 1
+        data = {}
+        for k in range(kmax, -1, -1):
+            #do not compute if syzygous degrees are high enough.
+            skip = False
+            for d in BinarySexticsCovariants.SyzygousDegrees:
+                if a - k <= d[0] and b - 2 *k <= d[1]:
+                    skip = True
+                    break
+            if (not skip) or k == 0:
+                print("\na = {}, b = {}".format(a - k, b - 2 * k))
+                L = BinarySexticsCovariants(a - k, b - 2 * k)._ComputeBasisCov5(data = data)
+        return L
 
     def _ComputeBasisAndRelationsCovOld(self):
         print("    Getting generators of covariants...")
@@ -858,7 +970,7 @@ class BinarySexticsCovariants(SageObject):
             [Co32*Co36, Co28*Co40, Co24*Co44, Co20*Co24^2, Co20^2*Co28, Co16*Co20*Co32]
 
         """
-        return self._ComputeBasisCov()
+        return self._ComputeBasisCov6()
 
     def GetBasisWithConditions(self):
         r"""
@@ -930,11 +1042,11 @@ class BinarySexticsCovariants(SageObject):
         ker = mat.right_kernel().basis_matrix()
         ker = ker * ker.denominator()
         ker = ker.change_ring(ZZ)
-        print("GetBasisWithConditions: saturation...")
-        ker = ker.saturation()
         if dim - len(rows) > 1:
             print("GetBasisWithConditions: lattice reduction...")
             ker = ker.LLL()
+        #print("GetBasisWithConditions: saturation...")
+        #ker = ker.saturation()
         res = []
         for LC in ker:
             cov = 0

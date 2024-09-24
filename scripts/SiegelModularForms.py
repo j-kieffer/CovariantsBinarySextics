@@ -55,7 +55,7 @@ def KernelVectors(mat):
     return ker
 
 def EvaluateCovariants(basis, chi):
-    RingCov = RingOfCovariants()
+    RingCov = RingOfCovariants(new_ordering = True)
     R = chi.base_ring()
     S = R.cover_ring()
     Rx = PolynomialRing(R, "x")

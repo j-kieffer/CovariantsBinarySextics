@@ -7,8 +7,20 @@ from functools import reduce
 from sage.all import QQ, PolynomialRing
 from sage.rings.invariants.invariant_theory import AlgebraicForm, transvectant
 
+def ListOfWeights(new_ordering = False):
+    if new_ordering:
+        return [(1, 6), (2, 8), (3, 12), (3, 8), (4, 10), (2, 4), (3, 6), (5, 8),
+                (4, 6), (4, 4), (6, 6), (6, 6), (5, 4), (3, 2), (7, 4), (9, 4),
+                (5, 2), (7, 2), (8, 2), (10, 2), (12, 2), (2, 0), (4, 0),
+                (6, 0), (10, 0), (15, 0)]
+    else:
+        return [(1, 6), (2, 0), (2, 4), (2, 8), (3, 2), (3, 6), (3, 8), (3, 12),
+                (4, 0), (4, 4), (4, 6), (4, 10), (5, 2), (5, 4), (5, 8), (6, 0),
+                (6, 6), (6, 6), (7, 2), (7, 4), (8, 2), (9, 4), (10, 0), (10, 2),
+                (12, 2), (15, 0)]
+
 # packaging Fabien's initialization function neatly to be able to use it in what follows
-def GetRingGeneratorsCov():
+def GetRingGeneratorsCov(new_ordering = False):
     """
     Compute generators for the entire ring of covariants of binary sextics
     """
@@ -62,17 +74,23 @@ def GetRingGeneratorsCov():
 
     C[(15,0)] = [transvectant(C[(3,8)][0], C32_4, 8)]
 
-    LW = [k for k in C.keys()]
-    values = [C[k] for k in LW]
-    LCov = [c.form().numerator() for c in reduce(lambda x,y : x + y, values)]
-    cov_names = [[''.join([str(j) for j in k]) for j in range(len(C[k]))] for k in LW]
-    wt_names = reduce(lambda x,y : x + y, [n if len(n) == 1 else [n[i] + str(i+1) for i in range(len(n))] for n in cov_names])
-    names = ['Co' + n for n in wt_names]
-    Co = PolynomialRing(QQ, names)
+    LW = ListOfWeights(new_ordering = new_ordering)
+    values = []
+    cov_names = []
+    i = 1
+    for k in LW:
+        name = "Co{}{}".format(k[0], k[1])
+        if k == (6, 6):
+            values.append(C[k][i - 1])
+            name += str(i)
+            i += 1
+        else:
+            values.append(C[k][0])
+        cov_names.append(name)
+    LCov = [c.form().numerator() for c in values]
+    Co = PolynomialRing(QQ, cov_names)
     LCo = Co.gens()
 
-    # Doubling of the (6,6)
-    LW = reduce(lambda x,y: x+y, [[k for p in C[k]] for k in LW])
     # Sanity check
     assert (len(LW) == len(LCo)) and (len(LCo) == len(LCov))
 
@@ -80,6 +98,6 @@ def GetRingGeneratorsCov():
 
     return LW, LCo, LCov, DCov
 
-def RingOfCovariants():
-    LW, LCo, LCov, DCov = GetRingGeneratorsCov()
+def RingOfCovariants(new_ordering = False):
+    LW, LCo, LCov, DCov = GetRingGeneratorsCov(new_ordering = new_ordering)
     return LCo[0].parent()
