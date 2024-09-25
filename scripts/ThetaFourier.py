@@ -86,7 +86,7 @@ class Chi(SageObject):
 
     #todo: cache some expansions?
 
-    def __init__(self, k, j = 0):
+    def __init__(self, k, j = 0, p = 0):
         #at the moment we only support Chi(-2,6), Chi(8,6), Chi(10,0)
         assert [k, j] in [[-2, 6], [8, 6], [10, 0]]
         self.weight = [k, j]
@@ -119,7 +119,8 @@ class Chi(SageObject):
             n1 = pt[1]
             term = q24 ** ((2 * n0 + char.mu1) * (2 * n1 + char.mu2))
             term *= q18 ** ((2 * n0 + char.mu1) ** 2) * q38 ** ((2 * n1 + char.mu2) ** 2)
-            term *= (n0 + char.mu1/2) ** gradient[0] * (n1 + char.mu2/2) ** gradient[1]
+            c = (n0 + char.mu1/2) ** gradient[0] * (n1 + char.mu2/2) ** gradient[1]
+            term = (c.numerator() * term) / c.denominator()
             if (n0 * char.nu1 + n1 * char.nu2) % 2 == 1:
                 term = -term
             res += term
@@ -130,13 +131,18 @@ class Chi(SageObject):
         c = QQ(1)
         d = QQ(1)/4
         for i in range(s_prec + 1):
-            q24 += c/ZZ(i).factorial() * s ** i
+            q24 += (c.numerator() * s ** i) / (ZZ(i).factorial() * c.denominator())
             c *= d
             d -= 1
         return q24
 
-    def _diag_parent_ring(q_prec, s_prec):
-        A = PolynomialRing(QQ, ["q1", "q3", "s"])
+    def _diag_parent_ring(q_prec, s_prec, p = 0):
+        if p == 0:
+            R = QQ
+        else:
+            R = GF(p)
+        A = PolynomialRing(R, ["q1", "q3", "s"])
+
         q1 = A.gen(0)
         q3 = A.gen(1)
         s = A.gen(2)
@@ -145,8 +151,12 @@ class Chi(SageObject):
         R = A.quotient(I, names = ["q1", "q3", "s"])
         return R
 
-    def _cusp_parent_ring(q_prec):
-        A = PolynomialRing(QQ, ["q1", "q3", "q2", "q2inv"]);
+    def _cusp_parent_ring(q_prec, p = 0):
+        if p == 0:
+            R = QQ
+        else:
+            R = GF(p)
+        A = PolynomialRing(R, ["q1", "q3", "q2", "q2inv"]);
         q1 = A.gen(0)
         q3 = A.gen(1)
         q2 = A.gen(2)
@@ -225,15 +235,15 @@ class Chi(SageObject):
 
     ###### Main methods ######
 
-    def diagonal_expansion(self, q_prec, s_prec):
+    def diagonal_expansion(self, q_prec, s_prec, p = 0):
         #divided by q1 q3 s^2 for (10,0) and q1 q3 s for (8,6)
         q8_prec = 8 * (q_prec + 1)
         s8_prec = s_prec + 1
         if self.weight == [10, 0] or self.weight == [-2, 6]:
             s8_prec += 1
 
-        R8 = Chi._diag_parent_ring(q8_prec, s8_prec)
-        R = Chi._diag_parent_ring(q_prec, s_prec)
+        R8 = Chi._diag_parent_ring(q8_prec, s8_prec, p = p)
+        R = Chi._diag_parent_ring(q_prec, s_prec, p = p)
         R8x = PolynomialRing(R8, "x")
         x = R8x.gen()
         q18 = R8.gen(0)
@@ -246,7 +256,7 @@ class Chi(SageObject):
             res = R8(1)
             for char in even:
                 res *= Chi._theta(q18, q38, q24, q8_prec, char)
-            res = QQ(2) ** (-12) * res ** 2
+            res = res ** 2 / (ZZ(2) ** 12)
             res = R(Chi._diag_convert(res.lift(), -1, -2))
             return res
 
@@ -257,7 +267,7 @@ class Chi(SageObject):
             for char in odd:
                 res *= (Chi._theta(q18, q38, q24, q8_prec, char, gradient = [1,0]) * x
                         + Chi._theta(q18, q38, q24, q8_prec, char, gradient = [0,1]))
-            res *= QQ(2) ** (-6)
+            res = res / (ZZ(2) ** 6)
             coeffs = [R(Chi._diag_convert(c.lift(), -1, -1))
                       for c in res.coefficients(sparse=False)]
             return Chi._binary_sextic(R, coeffs)
@@ -266,7 +276,7 @@ class Chi(SageObject):
             res = R8(1)
             for char in even:
                 res *= Chi._theta(q18, q38, q24, q8_prec, char)
-            chi10 = QQ(2) ** (-12) * res ** 2
+            chi10 = res ** 2 / (ZZ(2) ** 12)
             chi10 = R(Chi._diag_convert(chi10.lift(), -1, -2))
 
             res = R8x(res)
@@ -274,17 +284,17 @@ class Chi(SageObject):
             for char in odd:
                 res *= (Chi._theta(q18, q38, q24, q8_prec, char, gradient = [1,0]) * x
                         + Chi._theta(q18, q38, q24, q8_prec, char, gradient = [0,1]))
-            res *= QQ(2) ** (-6)
+            res = res / (ZZ(2) ** 6)
             coeffs = [R(Chi._diag_convert(c.lift(), -1, -1))
                       for c in res.coefficients(sparse=False)]
             res = Chi._binary_sextic(R, coeffs) * Chi._naive_inverse(chi10)
             return res
 
-    def cusp_expansion(self, q_prec):
+    def cusp_expansion(self, q_prec, p = 0):
         # divided by q1 q3 (q2 - 2 + q2inv) for chi10 and q1 q3 for chi86
         q8_prec = 8 * (q_prec + 1)
-        R8 = Chi._cusp_parent_ring(q8_prec)
-        R = Chi._cusp_parent_ring(q_prec)
+        R8 = Chi._cusp_parent_ring(q8_prec, p = p)
+        R = Chi._cusp_parent_ring(q_prec, p = p)
         q18 = R8.gen(0)
         q38 = R8.gen(1)
         q24 = R8.gen(2)
@@ -297,7 +307,7 @@ class Chi(SageObject):
             res = R8(1)
             for char in even:
                 res *= Chi._theta(q18, q38, q24, q8_prec, char)
-            res = QQ(2) ** (-12) * res ** 2
+            res = res ** 2 / (ZZ(2) ** 12)
             res = R(Chi._cusp_convert(res.lift(), -1))
             res = Chi._cusp_div_diag(res, 1)
             return res
@@ -309,7 +319,7 @@ class Chi(SageObject):
             for char in odd:
                 res *= (Chi._theta(q18, q38, q24, q8_prec, char, gradient = [1,0]) * x
                         + Chi._theta(q18, q38, q24, q8_prec, char, gradient = [0,1]))
-            res *= QQ(2) ** (-6)
+            res = res / (ZZ(2) ** 6)
             coeffs = [R(Chi._cusp_convert(c.lift(), -1))
                       for c in res.coefficients(sparse=False)]
             return Chi._binary_sextic(R, coeffs)
@@ -318,7 +328,7 @@ class Chi(SageObject):
             res = R8(1)
             for char in even:
                 res *= Chi._theta(q18, q38, q24, q8_prec, char)
-            chi10 = QQ(2) ** (-12) * res ** 2
+            chi10 = res ** 2 / (ZZ(2) ** 12)
             chi10 = R(Chi._cusp_convert(chi10.lift(), -1))
             chi10 = Chi._cusp_div_diag(chi10, 1)
 
@@ -326,7 +336,7 @@ class Chi(SageObject):
             for char in odd:
                 res *= (Chi._theta(q18, q38, q24, q8_prec, char, gradient = [1,0]) * x
                         + Chi._theta(q18, q38, q24, q8_prec, char, gradient = [0,1]))
-            res *= QQ(2) ** (-6)
+            res = res / (ZZ(2) ** 6)
             coeffs = [R(Chi._cusp_convert(c.lift(), -1))
                       for c in res.coefficients(sparse=False)]
             return Chi._binary_sextic(R, coeffs) * Chi._naive_inverse(chi10)

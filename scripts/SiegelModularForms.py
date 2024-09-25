@@ -8,7 +8,7 @@ from sage.rings.rational_field import QQ
 from sage.rings.integer_ring import ZZ
 from sage.rings.finite_rings.finite_field_constructor import GF
 from sage.rings.polynomial.polynomial_ring_constructor import PolynomialRing
-from sage.all import NumberField, pari, random_prime, Set
+from sage.all import NumberField, pari, random_prime, Set, next_prime
 from sage.functions.other import ceil, floor
 #from sage.sets.set import Set
 
@@ -55,40 +55,54 @@ def KernelVectors(mat):
     return ker
 
 def EvaluateCovariants(basis, chi):
-    RingCov = RingOfCovariants(new_ordering = True)
+    if len(basis) == 0:
+        return []
+
     R = chi.base_ring()
     S = R.cover_ring()
     Rx = PolynomialRing(R, "x")
 
     print("EvaluateCovariants: computing transvectants...")
     values = EvaluateBasicCovariants(chi, leading_coefficient = False)
-    subs_dict = {}
-    for i in range(26):
-        subs_dict[RingCov.gen(i)] = values[i]
     monomials = Set([])
     for b in basis:
         monomials = monomials.union(Set(b.monomials()))
-    monomials = monomials.list()
+    monomials = [m.degrees() for m in monomials.list()]
+
+    print("EvaluateCovariants: computing powers...")
+    powers = [[] for i in range(26)]
+    for i in range(26):
+        d = 0
+        for m in monomials:
+            d = max(d, m[i])
+        x = R(1)
+        for j in range(d + 1):
+            powers[i].append(x)
+            if j < d:
+                x *= values[i]
 
     print("EvaluateCovariants: substitution in {} monomials...".format(len(monomials)))
     subs_mon = {}
-    j = 0
+    maxlen = 0
     for m in monomials:
-        subs_mon[m] = m.subs(subs_dict).coefficients(sparse = False)
+        x = R(1)
+        for i in range(26):
+            if m[i] > 0:
+                x *= powers[i][m[i]]
+        subs_mon[m] = x.coefficients(sparse = False)
         subs_mon[m] = [c.lift() for c in subs_mon[m]]
-        j = max(j, len(subs_mon[m]))
-
+        maxlen = max(maxlen, len(subs_mon[m]))
     #padding in case leading coefficients are zero
     for m in monomials:
-        subs_mon[m] = subs_mon[m] + [S(0) for i in range(j + 1 - len(subs_mon[m]))]
+        subs_mon[m] = subs_mon[m] + [S(0) for i in range(maxlen + 1 - len(subs_mon[m]))]
 
     print("EvaluateCovariants: making {} linear combinations...".format(len(basis)))
     res = []
     for b in basis:
         r = []
-        mons = b.monomials()
+        mons = [m.degrees() for m in b.monomials()]
         coeffs = b.coefficients()
-        for k in range(j + 1):
+        for k in range(maxlen + 1):
             c = S(0)
             for i in range(len(mons)):
                 c += coeffs[i] * subs_mon[mons[i]][k]
@@ -136,7 +150,7 @@ class SMF(SageObject):
         return str(self)
 
     def SetBasis(self, L):
-        CRing = RingOfCovariants()
+        CRing = RingOfCovariants(new_ordering = True)
         self.basis = [CRing(x) for x in L]
 
     def Dimension(self):
@@ -274,6 +288,66 @@ class SMF(SageObject):
     #     basis = [sum([b.denominator()*b[i]*basis[i] for i in range(len(basis))]) for b in ker.basis()]
     #     return basis, prec, s_prec
 
+    def _ConfirmDimZero(self):
+        veck = self.k
+        vecj = self.j
+        p = 101
+        nbp = 5
+        a = veck + vecj // 2
+        vanishing_order = a
+        for m in range(nbp):
+            RingCov = RingOfCovariants(new_ordering = True, p = p)
+            if not self.character:
+                basis = BSC(a, vecj).GetBasisWithConditions(p = p)
+            else:
+                a -= 5
+                vanishing_order -= 6
+                basis = BSC(a, vecj).GetBasis()
+                basis = [RingCov(x) for x in basis]
+
+            #proceed as in _GetBasis, but over a finite field
+            s_prec = vanishing_order - 1
+            q_prec = 2
+            current_dim = len(basis)
+            prev_dim = current_dim + 1
+            chi = Chi(-2, 6).diagonal_expansion(1, 1, p = p)
+            R = chi.base_ring().cover_ring()
+            q1 = R.gen(0)
+            q3 = R.gen(1)
+            s = R.gen(2)
+
+            while current_dim > 0 and current_dim < prev_dim: #ensures termination
+                chi = Chi(-2, 6).diagonal_expansion(q_prec, s_prec, p = p)
+                print("GetBasis: looking for vanishing at order {} along diagonal".format(vanishing_order))
+                print("GetBasis: got q-expansion of chi(-2,6) at q-precision {}".format(q_prec))
+                qexps = EvaluateCovariants(basis, chi)
+                monomials = []
+                for i in range(q_prec + 1):
+                    for j in range(q_prec + 1):
+                        for k in range(s_prec + 1):
+                            for l in range(vecj + 1):
+                                monomials.append([[i,j,k], l])
+                nb = len(monomials)
+                mat = Matrix(GF(p), nb, len(basis))
+                print("GetBasis: linear algebra over Fp (size {} x {})...".format(nb, len(basis)))
+                for j in range(len(basis)):
+                    coeffs = qexps[j].coefficients(sparse = False)
+                    coeffs = [c.lift() for c in coeffs]
+                    coeffs += [R(0) for l in range(vecj + 1 - len(coeffs))]
+                    for i in range(nb):
+                        e, l = monomials[i]
+                        mat[i, j] = coeffs[l].coefficient(e)
+                prev_dim = current_dim
+                current_dim = len(basis) - mat.rank()
+                print ("GetBasis: found dimension {} at q-precision {}".format(current_dim, q_prec))
+                q_prec = q_prec + 1
+
+            if current_dim == 0:
+                break
+            p = next_prime(p)
+
+        return (current_dim == 0)
+
     def _GetBasis(basis, vanishing_order, dim, vecj, keq2 = False):
         # When k == 2 we don't know the dimension is 0, and want to verify it.
         if not keq2:
@@ -281,10 +355,9 @@ class SMF(SageObject):
                 return basis
             if (dim == 0):
                 return []
-            
         print("GetBasis: starting dimension {}, target {}".format(len(basis), dim))
 
-        RingCov = RingOfCovariants()
+        RingCov = RingOfCovariants(new_ordering = True)
         s_prec = vanishing_order - 1
         q_prec = 2
         current_dim = len(basis)
@@ -293,15 +366,6 @@ class SMF(SageObject):
         q1 = R.gen(0)
         q3 = R.gen(1)
         s = R.gen(2)
-        
-        monomials = []
-        for i in range(q_prec + 1):
-            for j in range(q_prec + 1):
-                for k in range(s_prec + 1):
-                    for l in range(vecj + 1):
-                        monomials.append([[i,j,k], l])
-        nb = len(monomials)
-        mat = Matrix(QQ, nb, len(basis))
 
         while current_dim > dim:
             chi = Chi(-2, 6).diagonal_expansion(q_prec, s_prec)
@@ -328,13 +392,12 @@ class SMF(SageObject):
             mat = mat * mat.denominator()
             mat = mat.change_ring(ZZ)
             mat_p = mat.change_ring(GF(p))
-            current_dim = len(basis) - mat_p.rank()
-            print ("GetBasis: found dimension {} at q-precision {}".format(current_dim, q_prec))
             rows = mat_p.pivot_rows()
+            current_dim = len(basis) - len(rows)
+            print ("GetBasis: found dimension {} at q-precision {}".format(current_dim, q_prec))
             mat = Matrix(QQ, [mat.row(i) for i in rows])
             q_prec = ceil(1.3 * q_prec + 1)
- 
-        
+
         print("GetBasis: linear algebra over QQ (size {} x {}, height {})...".format(mat.nrows(), len(basis), mat.height().global_height()))
         ker = mat.right_kernel().basis_matrix()
         ker = ker * ker.denominator()
@@ -394,6 +457,10 @@ class SMF(SageObject):
         dim = self.Dimension()
         if (k != 2) and (dim == 0):
             return []
+        elif k == 2:
+            if self._ConfirmDimZero():
+                return []
+            #else, continue with usual algorithm
 
         a = k + j // 2
         vanishing_order = a

@@ -4,7 +4,7 @@ This file contains a function returning a dictionary with the keys being the wei
 
 ## imports
 from functools import reduce
-from sage.all import QQ, PolynomialRing
+from sage.all import QQ, PolynomialRing, GF
 from sage.rings.invariants.invariant_theory import AlgebraicForm, transvectant
 
 def ListOfWeights(new_ordering = False):
@@ -20,11 +20,14 @@ def ListOfWeights(new_ordering = False):
                 (12, 2), (15, 0)]
 
 # packaging Fabien's initialization function neatly to be able to use it in what follows
-def GetRingGeneratorsCov(new_ordering = False):
+def GetRingGeneratorsCov(new_ordering = False, p = 0):
     """
     Compute generators for the entire ring of covariants of binary sextics
     """
-    A = PolynomialRing(QQ, 'a', 7)
+    if p == 0:
+        A = PolynomialRing(QQ, 'a', 7)
+    else:
+        A = PolynomialRing(GF(p), 'a', 7)
     a = A.gens()
     R = PolynomialRing(A, ['x', 'y'])
     x, y = R.gens()
@@ -87,9 +90,14 @@ def GetRingGeneratorsCov(new_ordering = False):
         else:
             values.append(C[k][0])
         cov_names.append(name)
-    LCov = [c.form().numerator() for c in values]
-    Co = PolynomialRing(QQ, cov_names)
-    LCo = Co.gens()
+    if p == 0:
+        LCov = [c.form().numerator() for c in values]
+        Co = PolynomialRing(QQ, cov_names)
+        LCo = Co.gens()
+    else:
+        LCov = [c.form() for c in values]
+        Co = PolynomialRing(GF(p), cov_names)
+        LCo = Co.gens()
 
     # Sanity check
     assert (len(LW) == len(LCo)) and (len(LCo) == len(LCov))
@@ -98,6 +106,6 @@ def GetRingGeneratorsCov(new_ordering = False):
 
     return LW, LCo, LCov, DCov
 
-def RingOfCovariants(new_ordering = False):
-    LW, LCo, LCov, DCov = GetRingGeneratorsCov(new_ordering = new_ordering)
+def RingOfCovariants(new_ordering = False, p = 0):
+    LW, LCo, LCov, DCov = GetRingGeneratorsCov(new_ordering = new_ordering, p = p)
     return LCo[0].parent()

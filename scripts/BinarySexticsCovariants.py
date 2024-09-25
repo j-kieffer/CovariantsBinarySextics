@@ -19,6 +19,7 @@ from sage.rings.finite_rings.finite_field_constructor import GF
 def EvaluateBasicCovariants(sextic, leading_coefficient = True):
     LW = BinarySexticsCovariants.LW
     R = sextic.base_ring()
+    Rx = PolynomialRing(R, "x")
     C = {}
     f = AlgebraicForm(2, 6, sextic)
     cofactors = [1, 60, 75, 90, 2250, 2250, 450, 540, 11250, 67500, 13500,
@@ -26,6 +27,11 @@ def EvaluateBasicCovariants(sextic, leading_coefficient = True):
                  60750000, 15187500, 9112500000, 227812500000, 13668750000,
                  8201250000000, 384433593750];
 
+    if sextic == 0:
+        if leading_coefficient:
+            return [R(0) for i in range(26)]
+        else:
+            return [Rx(0) for i in range(26)]
     C[(1,6)] = f
     #print("Transvectants: {} done".format(len(C.keys())))
     C[(2,0)] = transvectant(f, f, 6)
@@ -87,7 +93,6 @@ def EvaluateBasicCovariants(sextic, leading_coefficient = True):
         for k in C.keys():
             C[k] = R(C[k].polynomial().coefficient([k[1], 0]))
     else:
-        Rx = PolynomialRing(R, "x")
         for k in C.keys():
             pol = C[k].polynomial()
             coeffs = [pol.coefficient([i, k[1] - i]) for i in range(k[1] + 1)]
@@ -103,7 +108,8 @@ def EvaluateMonomialInCovariants(wt, basic):
     R = basic[0].parent()
     res = R(1)
     for i in range(26):
-        res *= basic[i] ** wt[i]
+        if wt[i] > 0:
+            res *= basic[i] ** wt[i]
     return res
 
 def EvaluateMonomialsInCovariants(wts, basic_list):
@@ -226,21 +232,21 @@ class BinarySexticsCovariants(SageObject):
     #Co52 Co661 Co662 Co60 Co74 Co72 Co82 Co94 Co102 Co100 Co122  Co150
     #We index the elements of SyzygousMonomials by the largest j such that LCo[j]
     #appears in the monomial.
-    SyzygousMonomials = {
-        2: [LCo[2]**2], #S1
-        3: [LCo[2] * LCo[3], LCo[3]**2], #S2, S5
-        5: [LCo[2] * LCo[5]], #S3
-        6: [LCo[2] * LCo[6], LCo[6]**2], #S4, S6
-        7: [LCo[5] * LCo[7]], #S11
-        8: [LCo[5] * LCo[8], LCo[6] * LCo[8]], #S8, S10
-        9: [LCo[9]**2], #S14
-        11: [LCo[5] * LCo[11]], #S13
-        13: [LCo[2] * LCo[13], LCo[6] * LCo[13], LCo[9] * LCo[13], LCo[11] * LCo[13],
-             LCo[5] * LCo[12] * LCo[13], LCo[12] * LCo[13]**2], #S7, S9, S12, S15, S16, S17
-        16: [LCo[9] * LCo[16], LCo[12] * LCo[13] * LCo[16]], #S18, S19
-        18: [LCo[13] * LCo[16] * LCo[18]] #S20
-    }
-    SyzygousDegrees = [(6, 6)]
+    # SyzygousMonomials = {
+    #     2: [LCo[2]**2], #S1
+    #     3: [LCo[2] * LCo[3], LCo[3]**2], #S2, S5
+    #     5: [LCo[2] * LCo[5]], #S3
+    #     6: [LCo[2] * LCo[6], LCo[6]**2], #S4, S6
+    #     7: [LCo[5] * LCo[7]], #S11
+    #     8: [LCo[5] * LCo[8], LCo[6] * LCo[8]], #S8, S10
+    #     9: [LCo[9]**2], #S14
+    #     11: [LCo[5] * LCo[11]], #S13
+    #     13: [LCo[2] * LCo[13], LCo[6] * LCo[13], LCo[9] * LCo[13], LCo[11] * LCo[13],
+    #          LCo[5] * LCo[12] * LCo[13], LCo[12] * LCo[13]**2], #S7, S9, S12, S15, S16, S17
+    #     16: [LCo[9] * LCo[16], LCo[12] * LCo[13] * LCo[16]], #S18, S19
+    #     18: [LCo[13] * LCo[16] * LCo[18]] #S20
+    # }
+    # SyzygousDegrees = [(6, 6)]
     # SyzygousMonomials = {7: [LCo[7]**2, LCo[7] * LCo[6], LCo[5] * LCo[7], LCo[4] * LCo[7]],
     #                      6: [LCo[6] * LCo[3], LCo[6]**2, LCo[6] * LCo[4]],
     #                      5: [LCo[5]**2, LCo[5] * LCo[4]],
@@ -251,6 +257,126 @@ class BinarySexticsCovariants(SageObject):
     #                      18: [LCo[6] * LCo[18], LCo[10] * LCo[18], LCo[17] * LCo[18]],
     #                      24: [LCo[9] * LCo[24]]
     #                      }
+    # After computations using _ComputeBasisCov5, we found:
+    Co16 = LCo[0]
+    Co28 = LCo[1]
+    Co312 = LCo[2]
+    Co38 = LCo[3]
+    Co410 = LCo[4]
+    Co24 = LCo[5]
+    Co36 = LCo[6]
+    Co58 = LCo[7]
+    Co46 = LCo[8]
+    Co44 = LCo[9]
+    Co661 = LCo[10]
+    Co662 = LCo[11]
+    Co54 = LCo[12]
+    Co32 = LCo[13]
+    Co74 = LCo[14]
+    Co94 = LCo[15]
+    Co52 = LCo[16]
+    Co72 = LCo[17]
+    Co82 = LCo[18]
+    Co102 = LCo[19]
+    Co122 = LCo[20]
+    Co20 = LCo[21]
+    Co40 = LCo[22]
+    Co60 = LCo[23]
+    Co100 = LCo[24]
+    Co150 = LCo[25]
+    SyzygousMonomials = {
+        2: [Co312**2],
+        3: [Co312*Co38, Co38**2],
+        5: [Co312*Co24],
+        6: [Co312*Co36, Co36**2],
+        7: [Co24*Co58, Co36*Co58, Co38*Co58, Co58**2, Co410*Co58],
+        8: [Co24*Co46, Co36*Co46, Co46**2, Co38*Co46, Co58*Co46, Co410*Co46],
+        9: [Co44**2, Co36*Co44, Co46*Co44, Co38*Co44, Co24**2*Co44, Co58*Co44,
+            Co410*Co44],
+        11: [Co24*Co662, Co44*Co662, Co36*Co662, Co46*Co662, Co661*Co662, Co662**2,
+             Co38*Co662, Co58*Co662, Co410*Co662, Co312*Co662],
+        13: [Co312*Co32, Co36*Co32, Co44*Co32, Co662*Co32, Co24*Co54*Co32,
+             Co54*Co32**2, Co661*Co32, Co32**4, Co58*Co32, Co46*Co32**2, Co24*Co32**3,
+             Co410*Co32, Co38*Co32**2, Co24**2*Co32**2, Co38*Co54*Co32],
+        16: [Co44*Co52, Co54*Co32*Co52, Co52**2, Co54*Co52, Co32**2*Co52, Co74*Co52,
+             Co94*Co52, Co36*Co52, Co46*Co52, Co661*Co52, Co662*Co52, Co58*Co52,
+             Co410*Co52, Co38*Co32*Co52, Co24**2*Co32*Co52, Co312*Co52],
+        18: [Co32*Co52*Co82, Co52*Co82, Co72*Co82, Co82**2, Co32**2*Co82, Co74*Co82,
+             Co94*Co82, Co46*Co82, Co661*Co82, Co662*Co82, Co54*Co32*Co82,
+             Co58*Co82, Co24*Co44*Co82, Co24*Co54*Co82, Co410*Co82,
+             Co24*Co36*Co82, Co38*Co32*Co82, Co24**2*Co32*Co82, Co312*Co82,
+             Co38*Co54*Co82, Co38*Co36*Co82],
+        23: [Co122*Co60, Co102*Co60**3, Co94*Co60, Co74*Co60**3, Co54*Co32*Co60,
+             Co32**3*Co60, Co662*Co60**2, Co54*Co102*Co60, Co54*Co82*Co60**2,
+             Co46*Co32*Co60, Co58*Co40*Co60, Co58*Co60**2, Co24*Co32*Co72*Co60,
+             Co36*Co102*Co40*Co60, Co36*Co102*Co60**2, Co24*Co32*Co52*Co60**3,
+             Co36*Co82*Co60**3, Co24*Co36*Co60, Co24*Co661*Co60,
+             Co24**2*Co52*Co20*Co60, Co24**2*Co72*Co20*Co60, Co24**2*Co102*Co20*Co60,
+             Co24**2*Co82*Co60**2, Co24**2*Co102*Co60**2, Co38*Co54*Co60**2,
+             Co24**2*Co54*Co60**2, Co38*Co36*Co60, Co410*Co24*Co60, Co38*Co661*Co60,
+             Co38*Co24*Co102*Co20*Co60, Co38*Co24*Co82*Co60**2,
+             Co38*Co24*Co102*Co60**2, Co312*Co44*Co60, Co410*Co36*Co60,
+             Co312*Co46*Co60, Co38*Co410*Co60, Co312*Co58*Co60, Co410**2*Co60,
+             Co312*Co410*Co60],
+        22: [Co122*Co40**2, Co94*Co40**2, Co54*Co32*Co40, Co32**3*Co40,
+             Co54*Co102*Co40, Co46*Co32*Co40, Co58*Co40**2, Co36*Co122*Co40,
+             Co36*Co102*Co40**2, Co24*Co36*Co40, Co24*Co661*Co40, Co24**2*Co72*Co40,
+             Co24**2*Co102*Co40, Co24**2*Co52*Co20*Co40**3, Co38*Co36*Co40,
+             Co410*Co24*Co40, Co38*Co661*Co40, Co38*Co24*Co72*Co40,
+             Co38*Co24*Co102*Co40, Co312*Co44*Co40, Co410*Co36*Co40,
+             Co312*Co46*Co40, Co38*Co410*Co40, Co312*Co58*Co40, Co410**2*Co40,
+             Co312*Co410*Co40],
+        24: [Co122*Co100, Co102*Co60*Co100, Co102*Co100**2, Co82*Co100**3,
+             Co94*Co100, Co32*Co72*Co100, Co74*Co60*Co100, Co74*Co100**2,
+             Co661*Co100, Co662*Co100, Co54*Co32*Co100, Co32**3*Co100,
+             Co54*Co82*Co100, Co54*Co102*Co100, Co58*Co100, Co46*Co32*Co100,
+             Co36*Co102*Co100, Co36*Co82*Co60*Co100, Co36*Co82*Co100**2,
+             Co410*Co100, Co24*Co36*Co100, Co24**2*Co52*Co100, Co24**2*Co72*Co100,
+             Co24**2*Co82*Co100, Co24**2*Co102*Co100, Co24**2*Co32*Co100**2,
+             Co24**2*Co32*Co60**2*Co100, Co38*Co24*Co100, Co24**3*Co100,
+             Co38*Co54*Co100, Co24**2*Co54*Co100, Co38*Co36*Co100,
+             Co312*Co44*Co100, Co312*Co46*Co100],
+        25: [Co82*Co150, Co102*Co150, Co122*Co150, Co32*Co150**2, Co52*Co150**2,
+             Co72*Co150**2, Co74*Co150, Co94*Co150, Co24*Co150**2, Co44*Co150**2,
+             Co54*Co150**2, Co662*Co150, Co54*Co32*Co150, Co32**3*Co150,
+             Co16*Co150**2, Co36*Co150**2, Co46*Co150**2, Co661*Co150**2, Co58*Co150,
+             Co46*Co32*Co150, Co28*Co150**2, Co38*Co150**2, Co24*Co36*Co150,
+             Co24*Co661*Co150, Co24**2*Co52*Co20*Co150, Co24**2*Co72*Co20*Co150,
+             Co24**2*Co32*Co100*Co150, Co410*Co150**2, Co38*Co54*Co150,
+             Co24**2*Co54*Co150, Co312*Co150**2, Co38*Co36*Co150, Co410*Co24*Co150,
+             Co38*Co661*Co150, Co312*Co44*Co150, Co410*Co36*Co150,
+             Co312*Co46*Co150, Co38*Co410*Co150, Co410**2*Co150,
+             Co312*Co410*Co150],
+        17: [Co52*Co72, Co72**2, Co54*Co72, Co32**2*Co72, Co74*Co72, Co94*Co72,
+             Co36*Co72, Co46*Co72, Co661*Co72, Co662*Co72, Co58*Co72,
+             Co24*Co44*Co72, Co410*Co72, Co38*Co32*Co72, Co24**2*Co32*Co72,
+             Co312*Co72],
+        19: [Co52*Co102, Co72*Co102, Co82*Co102, Co102**2, Co32**2*Co102,
+             Co74*Co102, Co94*Co102, Co46*Co102, Co661*Co102, Co662*Co102,
+             Co54*Co32*Co102, Co58*Co102, Co24*Co44*Co102, Co24*Co54*Co102,
+             Co410*Co102, Co24*Co36*Co102, Co38*Co32*Co102, Co24**2*Co32*Co102,
+             Co312*Co102, Co38*Co54*Co102, Co38*Co36*Co102],
+        20: [Co52*Co122, Co72*Co122, Co82*Co122, Co102*Co122, Co122**2, Co54*Co122,
+             Co32**2*Co122, Co74*Co122, Co94*Co122, Co46*Co122, Co661*Co122,
+             Co662*Co122, Co24**2*Co122, Co58*Co122, Co24*Co44*Co122, Co410*Co122,
+             Co24*Co36*Co122, Co38*Co32*Co122, Co312*Co122, Co38*Co24*Co122,
+             Co38*Co36*Co122],
+        14: [Co32*Co74, Co44*Co74, Co54*Co74, Co74**2, Co36*Co74, Co46*Co74,
+             Co661*Co74, Co662*Co74, Co38*Co74, Co24**2*Co74, Co58*Co74, Co410*Co74,
+             Co312*Co74],
+        15: [Co32*Co94, Co44*Co94, Co54*Co94, Co74*Co94, Co94**2, Co36*Co94,
+             Co46*Co94, Co661*Co94, Co662*Co94, Co38*Co94, Co24**2*Co94, Co58*Co94,
+             Co410*Co94, Co312*Co94],
+        12: [Co44*Co54, Co54**2, Co36*Co54, Co46*Co54, Co661*Co54, Co662*Co54,
+             Co58*Co54, Co410*Co54, Co312*Co54],
+        10: [Co44*Co661, Co36*Co661, Co46*Co661, Co661**2, Co58*Co661, Co410*Co661,
+             Co312*Co661],
+        21: [Co38*Co36*Co20, Co410*Co24*Co20, Co24**2*Co36*Co20,
+             Co38*Co24*Co52*Co20, Co24**3*Co52*Co20, Co38*Co24*Co72*Co20,
+             Co24**3*Co72*Co20, Co312*Co44*Co20, Co410*Co36*Co20, Co312*Co46*Co20,
+             Co38*Co410*Co20, Co312*Co58*Co20, Co410**2*Co20, Co312*Co410*Co20**2]
+    }
+
 
     # Verifying the expression for C_{2,0}
     if not new_ordering:
@@ -874,6 +1000,7 @@ class BinarySexticsCovariants(SageObject):
         b = self.b
         kmax = min(a, b // 2) - 1
         data = {}
+        L = []
         for k in range(kmax, -1, -1):
             #do not compute if syzygous degrees are high enough.
             skip = False
@@ -970,9 +1097,9 @@ class BinarySexticsCovariants(SageObject):
             [Co32*Co36, Co28*Co40, Co24*Co44, Co20*Co24^2, Co20^2*Co28, Co16*Co20*Co32]
 
         """
-        return self._ComputeBasisCov6()
+        return self._ComputeBasisCov5()
 
-    def GetBasisWithConditions(self):
+    def GetBasisWithConditions(self, p = 0):
         r"""
         Return a set of linearly independent elements in the space of covariants that is
         sufficient to generate the space of holomorphic Siegel modular forms of the
@@ -987,7 +1114,10 @@ class BinarySexticsCovariants(SageObject):
         if len(B) == 0:
             return []
         W = [b.exponents()[0] for b in B]
-        R = PolynomialRing(QQ, ["x", "y"])
+        if p == 0:
+            R = PolynomialRing(QQ, ["x", "y"])
+        else:
+            R = PolynomialRing(GF(p), ["x", "y"])
         x = R.gen(0)
         y = R.gen(1)
         eval_data = []
@@ -1006,10 +1136,10 @@ class BinarySexticsCovariants(SageObject):
             a4p = fp.coefficient(x**2 * y**4)
 
             #evaluate basis elements
-            new_eval = [EvaluateMonomialInCovariants(wt, basic).coefficients(sparse = False)
-                        for wt in W]
-            new_evalp = [EvaluateMonomialInCovariants(wt, basicp).coefficients(sparse = False)
-                         for wt in W]
+            new_eval_all = EvaluateMonomialsInCovariants(W, [basic, basicp])
+            new_eval = [pol.coefficients(sparse = False) for pol in new_eval_all[0]]
+            new_evalp = [pol.coefficients(sparse = False) for pol in new_eval_all[1]]
+
             #padding in case the evaluation has smaller degree
             for v in new_eval:
                 v += [0 for i in range(self.b + 1 - len(v))]
@@ -1032,25 +1162,32 @@ class BinarySexticsCovariants(SageObject):
                 eval_data.append(line)
 
         #do linear algebra
-        print("GetBasisWithConditions: linear algebra over Fp...")
-        p = random_prime(10000, lbound = 5000)
-        mat = Matrix(GF(p), eval_data)
-        rows = mat.pivot_rows()
-        print("GetBasisWithConditions: found dimension {}".format(dim - len(rows)))
-        mat = Matrix(QQ, [eval_data[i] for i in rows])
-        print("GetBasisWithConditions: linear algebra over QQ (size {} x {}, height {})...".format(len(rows), dim, mat.height().global_height()))
-        ker = mat.right_kernel().basis_matrix()
-        ker = ker * ker.denominator()
-        ker = ker.change_ring(ZZ)
-        if dim - len(rows) > 1:
-            print("GetBasisWithConditions: lattice reduction...")
-            ker = ker.LLL()
-        #print("GetBasisWithConditions: saturation...")
-        #ker = ker.saturation()
+        if p == 0:
+            print("GetBasisWithConditions: linear algebra over Fp...")
+            p = random_prime(10000, lbound = 5000)
+            mat = Matrix(GF(p), eval_data)
+            rows = mat.pivot_rows()
+            print("GetBasisWithConditions: found dimension {}".format(dim - len(rows)))
+            mat = Matrix(QQ, [eval_data[i] for i in rows])
+            print("GetBasisWithConditions: linear algebra over QQ (size {} x {}, height {})...".format(len(rows), dim, mat.height().global_height()))
+            ker = mat.right_kernel().basis_matrix()
+            ker = ker * ker.denominator()
+            ker = ker.change_ring(ZZ)
+            if dim - len(rows) > 1:
+                print("GetBasisWithConditions: lattice reduction...")
+                ker = ker.LLL()
+            print("GetBasisWithConditions: saturation...")
+            ker = ker.saturation()
+        else:
+            print("GetBasisWithConditions: linear algebra over Fp...")
+            mat = Matrix(GF(p), eval_data)
+            ker = mat.right_kernel().basis_matrix()
+            print("GetBasisWithConditions: found dimension {}".format(ker.nrows()))
+
         res = []
         for LC in ker:
             cov = 0
             for i in range(len(LC)):
                 cov += LC[i] * B[i]
-            res.append(cov / cov.content())
+            res.append(cov)
         return res
