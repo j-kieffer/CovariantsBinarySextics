@@ -246,6 +246,12 @@ class BinarySexticsCovariants(SageObject):
     #     16: [LCo[9] * LCo[16], LCo[12] * LCo[13] * LCo[16]], #S18, S19
     #     18: [LCo[13] * LCo[16] * LCo[18]] #S20
     # }
+    # Stroh's relations are in weights:
+    # S1     S2     S3     S4     S5     S6     S7     S8     S9    S10    S11
+    # (6,24) (6,20) (5,16) (5,18) (6,16) (6,12) (6,14) (6,10) (6,8) (7,12) (7,12)
+    # S12   S13    S14   S15   S16     S17    S18   S19    S20
+    # (7,6) (8,10) (8,8) (9,8) (10,10) (11,8) (9,6) (13,8) (16,6)
+
     # SyzygousDegrees = [(6, 6)]
     # SyzygousMonomials = {7: [LCo[7]**2, LCo[7] * LCo[6], LCo[5] * LCo[7], LCo[4] * LCo[7]],
     #                      6: [LCo[6] * LCo[3], LCo[6]**2, LCo[6] * LCo[4]],
@@ -563,41 +569,58 @@ class BinarySexticsCovariants(SageObject):
             return d
 
     # This is slowish (Gauss pivot on a possibly huge matrix over QQ...)
-    def _ComputeBasisAndRelationsCov(self):
+    def _ComputeBasisAndRelationsCov(self, use_syzygies = False):
         r"""
         Computes the basis and relations for both of the following functions
         """
         LW = BinarySexticsCovariants.LW
-        W = BinarySexticsCovariants.GetGeneratorsCov(LW, self.weight)
+        if use_syzygies:
+            W = BinarySexticsCovariants.GetGeneratorsCov3(LW, self.weight)
+        else:
+            W = BinarySexticsCovariants.GetGeneratorsCov(LW, self.weight)
         dim = self.Dimension()
+        covs = [self.MakeMonomial(wt) for wt in W]
         if (dim == 0):
             return [], [], []
+        elif dim == len(W):
+            return covs, [], covs
         eval_data = []
         R = PolynomialRing(QQ, ["x", "y"])
 
-        for i in range(dim):
+        for i in range(dim + 5):
             f = RandomSextic(R, 10)
             basic = EvaluateBasicCovariants(f)
             new_eval = [EvaluateMonomialInCovariants(wt, basic) for wt in W]
+            if use_syzygies:
+                new_eval.reverse() #to get leading term from echelonized_basis
             eval_data.append(new_eval)
 
-        eval_mat = Matrix(eval_data).transpose()
+        p = 101
+        eval_mat = Matrix(GF(p), eval_data).transpose()
         print("Computing rank (size {} * {})...".format(len(W), dim))
         rk = eval_mat.rank()
         print("done")
         while (rk < dim):
             print("One more evaluation point (current rank {})".format(rk))
+            p = next_prime(p)
             f = RandomSextic(R, 100)
             basic = EvaluateBasicCovariants(f)
             new_eval = [EvaluateMonomialInCovariants(wt, basic) for wt in W]
+            if use_syzygies:
+                eval_data.reverse()
             eval_data.append(new_eval)
-            eval_mat = Matrix(eval_data).transpose()
+            eval_mat = Matrix(GF(p), eval_data).transpose()
             rk = eval_mat.rank()
 
-        rels = eval_mat.kernel().basis()
+        eval_mat = Matrix(QQ, eval_data).transpose()
+        rels = eval_mat.kernel().echelonized_basis()
         rels = [rel.denominator() * rel for rel in rels]
+        rels = [r.list() for r in rels]
+        if use_syzygies:
+            for r in rels:
+                r.reverse()
+            W.reverse()
         C_basis = [self.MakeMonomial(W[i]) for i in eval_mat.pivot_rows()]
-        covs = [self.MakeMonomial(wt) for wt in W]
         assert len(C_basis) == dim
         return C_basis, rels, covs
 
@@ -1191,3 +1214,66 @@ class BinarySexticsCovariants(SageObject):
                 cov += LC[i] * B[i]
             res.append(cov)
         return res
+
+def ConstructGroebnerBasis():
+    BinarySexticsCovariants.SyzygousMonomials = {}
+    gbasis = []
+    for j in range(0, 25, 2):
+        for k in range(2, 49):
+            print("ConstructGroebnerBasis: k = {}, j = {}".format(k, j))
+            S = BinarySexticsCovariants(k, j)
+            # compute rels as a list of tuples
+            _, rels, covs = S._ComputeBasisAndRelationsCov(use_syzygies = True)
+            for r in rels:
+                # add polynomial to gbasis, and leading term to SyzygousMonomials
+                imax = 0
+                for i in range(len(r)):
+                    if r[i] > 0:
+                        imax = i
+                mon = covs[imax]
+                d = mon.degrees()
+                index = 0
+                for i in range(26):
+                    if d[i] > 0:
+                        index = i
+                print("k = {}, j = {}, adding monomial {}".format(k, j, mon))
+                if index in BinarySexticsCovariants.SyzygousMonomials.keys():
+                    BinarySexticsCovariants.SyzygousMonomials[index].append(mon)
+                else:
+                    BinarySexticsCovariants.SyzygousMonomials[index] = [mon]
+                pol = 0
+                for i in range(len(r)):
+                    pol += r[i] * covs[i]
+                gbasis.append(pol)
+    return gbasis
+
+def PrintGroebnerBasis(gbasis):
+    with open("Groebner.dat", "w") as f:
+        for x in gbasis:
+            f.write(str(x))
+            f.write("\n")
+
+def ReadGroebnerBasis():
+    R = BinarySexticsCovariants.LCo[0].parent()
+    gbasis = []
+    with open("Groebner.dat") as f:
+        for line in f:
+            gbasis.append(R(line))
+    return gbasis
+
+def SyzygousMonomials():
+    res = {}
+    gbasis = ReadGroebnerBasis()
+    lm = [pol.lm() for pol in gbasis]
+    for mon in lm:
+        d = mon.degrees()
+        index = 0
+        for i in range(26):
+            if d[i] > 0:
+                index = i
+        if index in res.keys():
+            res[index].append(mon)
+        else:
+            res[index] = [mon]
+    return res
+
