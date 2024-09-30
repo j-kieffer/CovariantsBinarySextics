@@ -9,7 +9,7 @@ from sage.all import Matrix, Partitions, ZZ, QQ, prod, Set, PolynomialRing, rand
 from sage.combinat.q_analogues import q_multinomial
 from sage.combinat.q_analogues import q_binomial
 from sage.combinat.integer_vector_weighted import WeightedIntegerVectors
-from Generators_Ring_Covariants_Sextic import GetRingGeneratorsCov
+from Generators_Ring_Covariants_Sextic import GetRingGeneratorsCov, LeadingMonomial
 from sage.misc.prandom import randint
 from sage.rings.invariants.invariant_theory import AlgebraicForm, transvectant
 from sage.arith.misc import next_prime
@@ -107,7 +107,7 @@ def EvaluateBasicCovariants(sextic, leading_coefficient = True):
 def EvaluateMonomialInCovariants(wt, basic):
     R = basic[0].parent()
     res = R(1)
-    for i in range(26):
+    for i in range(len(wt)):
         if wt[i] > 0:
             res *= basic[i] ** wt[i]
     return res
@@ -1219,6 +1219,7 @@ def ConstructGroebnerBasis():
     BinarySexticsCovariants.SyzygousMonomials = {}
     gbasis = []
     for j in range(0, 25, 2):
+        nb = 0
         for k in range(2, 49):
             print("ConstructGroebnerBasis: k = {}, j = {}".format(k, j))
             S = BinarySexticsCovariants(k, j)
@@ -1245,6 +1246,8 @@ def ConstructGroebnerBasis():
                 for i in range(len(r)):
                     pol += r[i] * covs[i]
                 gbasis.append(pol)
+                nb += 1
+        print("total j = {}: {}".format(j, nb))
     return gbasis
 
 def PrintGroebnerBasis(gbasis):
@@ -1264,16 +1267,15 @@ def ReadGroebnerBasis():
 def SyzygousMonomials():
     res = {}
     gbasis = ReadGroebnerBasis()
-    lm = [pol.lm() for pol in gbasis]
-    for mon in lm:
-        d = mon.degrees()
+    for x in gbasis:
+        ld = LeadingMonomial(x).degrees()
         index = 0
         for i in range(26):
-            if d[i] > 0:
+            if ld[i] > 0:
                 index = i
         if index in res.keys():
-            res[index].append(mon)
+            res[index].append(lm)
         else:
-            res[index] = [mon]
+            res[index] = [lm]
     return res
 

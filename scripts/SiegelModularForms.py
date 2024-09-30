@@ -1,4 +1,5 @@
 #from functools import reduce
+import string
 from sage.structure.sage_object import SageObject
 from sage.matrix.constructor import Matrix
 #from sage.modules.free_module import VectorSpace
@@ -126,19 +127,198 @@ class SMF(SageObject):
     sage: len(SMF(12,0).GetBasis())
     3
     """
-    prec = 0
-    chi = 0
-    t_chi = 0
+    #prec = 0
+    #chi = 0
+    #t_chi = 0
+
+    gens = []
+    weights = [] #elements of (ZZ,ZZ,ZZ/2ZZ) to account for character
+    names = []
+    ring = QQ
+    gbasis = []
+    lt = {}
+
+    def _GetNames(weights):
+        names = []
+        for i in range(len(weights)):
+            j0 = 0
+            for j in range(1, len(weights) - i):
+                if weights[j] == weights[i]:
+                    j0 = j
+                else:
+                    break
+            if j0 == 0:
+                names.append("S_{}_{}_{}".format(weight[i][0], weight[i][1], weight[i][2]))
+            else:
+                assert j0 < 26
+                names += ["S_{}_{}_{}{}".format(weight[i][0], weight[i][1], weight[i][2], string.ascii_lowerace[j])
+                          for j in range(j0)]
+
+    def _AddGenerators(covariants, weight, character):
+        index = 0
+        slope = ZZ(weight[1])/ZZ(weight[0])
+        for i in range(len(SMF.gens)):
+            w = weights[i]
+            s = ZZ(w[1])/ZZ(w[0])
+            if s > slope or (s == slope and w[0] < weight[0]) or (s == slope and w[0] == weight[0] and w[2] == 0 and character):
+                index += 1
+            else:
+                break
+        SMF.gens = SMF.gens[0:index] + covariants + SMF.gens[index:]
+        if character:
+            eps = GF(2)(1)
+        else:
+            eps = GF(2)(0)
+        SMF.weights = SMF.weights[0:index] + [(weight[0], weight[1], eps) for i in range(len(covariants))] + SMF.weights[index:]
+        SMF.names = SMF._GetNames(SMF.weights)
+        SMF.ring = PolynomialRing(Rationals(), names)
+        newgbasis = []
+        for r in SMF.gbasis:
+            newr = SMF.ring(0)
+            mons = [m.degrees() for m in r.monomials()]
+            coeffs = r.coefficients()
+            for i in range(len(mons)):
+                newr += c[i] * SMF.ring(mons[i][0:index] + [0 for j in range(len(covariants))] + mons[i][index:])
+            newgbasis.append(r)
+        SMF.gbasis = newgbasis
+        newlt = {}
+        for d in SMF.lt.keys():
+            newlist = []
+            for t in SMF.lt[j]:
+                newlist.append((t[0:index] + [0 for j in range(len(covariants))] + t[index:]))
+            if d < index:
+                newlt[d] = newlist
+            else:
+                newlt[d + len(covariants)] = newlist
+        SMF.lt = newlt
+        return SMF.ring.gens()[index:index + len(covariants)]
+
+    def _GetGenerators(weight_list, wt, syzygous):
+        if wt[0] == 0 and wt[1] == 0 and wt[2] == 0:
+            return [[0 for i in range(len(weight_list))]]
+        elif wt[0] == 0:
+            return []
+        elif len(weight_list) == 0:
+            return []
+
+        #Compute min_w0, max_w0
+        wt0 = weight_list[0]
+        max_w0 = min([wt[i] // wt0[i] for i in range(2) if wt0[i] != 0])
+        min_w0 = 0
+        if wt0[1] > 0:
+            slope = ZZ(weight_list[1][1]) / ZZ(weight_list[1][0])
+            assert wt0[1] - slope * wt0[0] >= 0
+            if wt[1] - slope * wt[0] > 0:
+                if wt0[1] - slope * wt0[0] == 0:
+                    return []
+                else:
+                    min_w0 = ceil((wt[1] - slope * wt[0])/(wt0[1] - slope * wt0[0]))
+
+        #adjust max_w0 given the list of syzygous monomials.
+        degrees = syzygous.get(index)
+        if not degrees is None:
+            for d in degrees:
+                max_w0 = min(max_w0, d[index] - 1)
+
+        all_ws = []
+        for w0 in range(max_w0, min_w0 - 1, -1):
+            new_syzygous = {}
+            #ignore monomials whose degree in the current covariant is more than w0.
+            for n in syzygous:
+                if n > index:
+                    new_syzygous[n] = [d for d in syzygous[n] if d[index] <= w0]
+            ws = SMF._GetGenerators(weight_list[1:], (wt[0]-w0*wt0[0], wt[1]-w0*wt0[1], wt[2] - w0*wt0[2]),
+                                    new_syzygous)
+            all_ws += [[w0] + w for w in ws]
+        return all_ws
+
+    def _CompareMonomials(u, v):
+        assert len(u) == len(SMF.gens())
+        assert len(u) == len(v)
+        for i in range(len(u)):
+            if u[i] < v[i]:
+                return -1
+            elif u[i] > v[i]:
+                return 1
+        return 0
+
+    def _AddRelation(zerosmf):
+        SMF.gbasis.append(zerosmf)
+        #find out what the leading term is. Sage doesn't have the monomial order we want...
+        d = [m.degrees() for m in zerosmf.monomials()]
+        lt = d[0]
+        for i in range(1, len(d)):
+            if SMF_CompareMonomials(lt, d[i]) == 1:
+                lt = d[i]
+        #find out where to put it in the dictionary
+        index = 0
+        r = d[i]
+        for j in range(len(r)):
+            if r[j] > 0:
+                index = j
+        if index in SMF.lt:
+            SMF.lt[index].append(r)
+        else:
+            SMF.lt[index] = [r]
+
+    def _ExtractBasis(smfs):
+        #expand in terms of covariants
+        covariants = []
+        for s in smfs:
+            assert s.is_monomial()
+            w = s.degrees()
+            covariants.append(EvaluateMonomialInCovariants(w, SMF.gens))
+        #reduce mod Gröbner basis
 
     def __init__(self, k, j, character = False):
         self.k = k
         self.j = j
-        self.prec = 3
+        #self.prec = 3
         self.dim = None
         self.basis = None
         self.decomposition = None
         self.fields = None
         self.character = character
+
+    def _EvaluateGens(covariants):
+        #this is copy-pasted from EvaluateCovariants (with simplifications)
+        if len(SMF.gens) == 0:
+            return []
+
+        R = covariants[0].parent()
+        monomials = Set([])
+        for b in SMF.gens:
+            monomials = monomials.union(Set(b.monomials()))
+        monomials = [m.degrees() for m in monomials.list()]
+
+        powers = [[] for i in range(26)]
+        for i in range(26):
+            d = 0
+            for m in monomials:
+                d = max(d, m[i])
+            x = R(1)
+            for j in range(d + 1):
+                powers[i].append(x)
+                if j < d:
+                    x *= values[i]
+
+        subs_mon = {}
+        for m in monomials:
+            x = R(1)
+            for i in range(26):
+                if m[i] > 0:
+                    x *= powers[i][m[i]]
+            subs_mon[m] = x
+
+        res = []
+        for b in SMF.gens:
+            mons = [m.degrees() for m in b.monomials()]
+            coeffs = b.coefficients()
+            c = R(0)
+            for i in range(len(mons)):
+                c += coeffs[i] * subs_mon[mons[i]][k]
+            res.append(c)
+        return res
 
     def __str__(self):
         s = "Space of Siegel modular form of weight ("+str(self.k)+"," + str(self.j) + ")"
@@ -149,9 +329,9 @@ class SMF(SageObject):
     def __repr__(self):
         return str(self)
 
-    def SetBasis(self, L):
-        CRing = RingOfCovariants(new_ordering = True)
-        self.basis = [CRing(x) for x in L]
+    # def SetBasis(self, L):
+    #    CRing = RingOfCovariants(new_ordering = True)
+    #    self.basis = [CRing(x) for x in L]
 
     def Dimension(self):
         if not self.dim is None:
@@ -166,6 +346,16 @@ class SMF(SageObject):
         else:
             self.dim = dim_splitting_VV_All_weight(self.k, self.j)['total_dim']
         return self.dim
+
+    def _KnownSMFs(self):
+        if self.dim == 0:
+            return []
+        else:
+            if self.character:
+                eps = GF(2)(1)
+            else:
+                eps = GF(2)(0)
+            return SMF._GetGenerators(SMF.weights, (self.k, self.j, eps), SMF.lt)
 
     # def _subs_chi(basis, chi, t_chi, s_prec):
     #     RingCov = BSC.LCov[0].parent()
@@ -348,19 +538,19 @@ class SMF(SageObject):
 
         return (current_dim == 0)
 
-    def _GetBasis(basis, vanishing_order, dim, vecj, keq2 = False):
+    def _GetBasis(covbasis, vanishing_order, dim, vecj, keq2 = False):
         # When k == 2 we don't know the dimension is 0, and want to verify it.
         if not keq2:
-            if len(basis) == dim:
-                return basis
+            if len(covbasis) == dim:
+                return covbasis
             if (dim == 0):
                 return []
-        print("GetBasis: starting dimension {}, target {}".format(len(basis), dim))
+        print("GetBasis: starting dimension {}, target {}".format(len(covbasis), dim))
 
         RingCov = RingOfCovariants(new_ordering = True)
         s_prec = vanishing_order - 1
         q_prec = 2
-        current_dim = len(basis)
+        current_dim = len(covbasis)
         chi = Chi(-2, 6).diagonal_expansion(1, 1)
         R = chi.base_ring().cover_ring()
         q1 = R.gen(0)
@@ -371,7 +561,7 @@ class SMF(SageObject):
             chi = Chi(-2, 6).diagonal_expansion(q_prec, s_prec)
             print("GetBasis: looking for vanishing at order {} along diagonal".format(vanishing_order))
             print("GetBasis: got q-expansion of chi(-2,6) at q-precision {}".format(q_prec))
-            qexps = EvaluateCovariants(basis, chi)
+            qexps = EvaluateCovariants(covbasis, chi)
             monomials = []
             for i in range(q_prec + 1):
                 for j in range(q_prec + 1):
@@ -379,9 +569,9 @@ class SMF(SageObject):
                         for l in range(vecj + 1):
                             monomials.append([[i,j,k], l])
             nb = len(monomials)
-            mat = Matrix(QQ, nb, len(basis))
-            print("GetBasis: linear algebra over Fp (size {} x {})...".format(nb, len(basis)))
-            for j in range(len(basis)):
+            mat = Matrix(QQ, nb, len(covbasis))
+            print("GetBasis: linear algebra over Fp (size {} x {})...".format(nb, len(covbasis)))
+            for j in range(len(covbasis)):
                 coeffs = qexps[j].coefficients(sparse = False)
                 coeffs = [c.lift() for c in coeffs]
                 coeffs += [R(0) for l in range(vecj + 1 - len(coeffs))]
@@ -393,12 +583,12 @@ class SMF(SageObject):
             mat = mat.change_ring(ZZ)
             mat_p = mat.change_ring(GF(p))
             rows = mat_p.pivot_rows()
-            current_dim = len(basis) - len(rows)
+            current_dim = len(covbasis) - len(rows)
             print ("GetBasis: found dimension {} at q-precision {}".format(current_dim, q_prec))
             mat = Matrix(QQ, [mat.row(i) for i in rows])
             q_prec = ceil(1.3 * q_prec + 1)
 
-        print("GetBasis: linear algebra over QQ (size {} x {}, height {})...".format(mat.nrows(), len(basis), mat.height().global_height()))
+        print("GetBasis: linear algebra over QQ (size {} x {}, height {})...".format(mat.nrows(), len(covbasis), mat.height().global_height()))
         ker = mat.right_kernel().basis_matrix()
         ker = ker * ker.denominator()
         ker = ker.change_ring(ZZ)
@@ -410,8 +600,8 @@ class SMF(SageObject):
         res = []
         for v in ker:
             c = RingCov(0)
-            for i in range(len(basis)):
-                c += v[i] * basis[i]
+            for i in range(len(covbasis)):
+                c += v[i] * covbasis[i]
             c = c / c.content()
             res.append(c)
 
@@ -446,6 +636,41 @@ class SMF(SageObject):
     #         pole_ord -= 2
 
     #     return self.basis
+
+    def _GetNewGenerators(self, knownsmfs, covbasis, vanishing_order, dim, vecj):
+        #Expand knownsmfs as covariants
+        knowncovariants = []
+        for s in knownsmfs: #a list of monomials
+            assert s.is_monomial()
+            w = s.degrees()
+            knowncovariants.append(EvaluateMonomialInCovariants(w, SMF.gens))
+
+    def _GeneratorsAndRelations(self):
+        k = self.k
+        j = self.j
+        dim = self.Dimension()
+        if k != 2 and dim == 0:
+            return
+        elif k == 2:
+            if self._ConfirmDimZero():
+                return
+
+        #get generators from known SMFs
+        knownsmfs = self._KnownSMFs()
+        knownsmfs = SMF._ExtractBasis(knownsmfs) #this also adds relations
+        if len(knownsmfs) == dim:
+            return
+
+        #otherwise, construct new generators from covariants
+        a = k + j // 2
+        vanishing_order = a
+        if not self.character:
+            covbasis = BSC(a, j).GetBasisWithConditions()
+        else:
+            a -= 5
+            vanishing_order -= 6
+            covbasis = BSC(a, j).GetBasis()
+        self._GetNewGenerators(knownsmfs, covbasis, vanishing_order, dim, j)
 
     def GetBasis(self):
         if not self.basis is None:

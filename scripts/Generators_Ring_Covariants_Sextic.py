@@ -109,3 +109,20 @@ def GetRingGeneratorsCov(new_ordering = False, p = 0):
 def RingOfCovariants(new_ordering = False, p = 0):
     LW, LCo, LCov, DCov = GetRingGeneratorsCov(new_ordering = new_ordering, p = p)
     return LCo[0].parent()
+
+def LeadingMonomial(cov):
+    assert cov != 0
+    mon = x.monomials()
+    lm = mon[0]
+    ld = lm.degrees()
+    for i in range(1, len(mon)):
+        newd = mon[i].degrees()
+        for j in range(26):
+            if newd[j] > ld[j]:
+                break
+            elif newd[j] < ld[j]: #found bigger monomial
+                lm = mon[i]
+                ld = newd
+                break
+        assert j < 26
+    return lm
