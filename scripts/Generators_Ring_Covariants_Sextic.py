@@ -3,21 +3,8 @@ This file contains a function returning a dictionary with the keys being the wei
 """
 
 ## imports
-from functools import reduce
-from sage.all import QQ, PolynomialRing, GF
+from sage.all import QQ, PolynomialRing, GF, TermOrder
 from sage.rings.invariants.invariant_theory import AlgebraicForm, transvectant
-
-def ListOfWeights(new_ordering = False):
-    if new_ordering:
-        return [(1, 6), (2, 8), (3, 12), (3, 8), (4, 10), (2, 4), (3, 6), (5, 8),
-                (4, 6), (4, 4), (6, 6), (6, 6), (5, 4), (3, 2), (7, 4), (9, 4),
-                (5, 2), (7, 2), (8, 2), (10, 2), (12, 2), (2, 0), (4, 0),
-                (6, 0), (10, 0), (15, 0)]
-    else:
-        return [(1, 6), (2, 0), (2, 4), (2, 8), (3, 2), (3, 6), (3, 8), (3, 12),
-                (4, 0), (4, 4), (4, 6), (4, 10), (5, 2), (5, 4), (5, 8), (6, 0),
-                (6, 6), (6, 6), (7, 2), (7, 4), (8, 2), (9, 4), (10, 0), (10, 2),
-                (12, 2), (15, 0)]
 
 # packaging Fabien's initialization function neatly to be able to use it in what follows
 def GetRingGeneratorsCov(new_ordering = False, p = 0):
@@ -91,13 +78,13 @@ def GetRingGeneratorsCov(new_ordering = False, p = 0):
             values.append(C[k][0])
         cov_names.append(name)
     if p == 0:
+        base_ring = QQ
         LCov = [c.form().numerator() for c in values]
-        Co = PolynomialRing(QQ, cov_names)
-        LCo = Co.gens()
     else:
+        base_ring = GF(p)
         LCov = [c.form() for c in values]
-        Co = PolynomialRing(GF(p), cov_names)
-        LCo = Co.gens()
+    Co = PolynomialRing(base_ring, cov_names, order = TermOrder('wdegrevlex', tuple([w[0] for w in LW])))
+    LCo = Co.gens()
 
     # Sanity check
     assert (len(LW) == len(LCo)) and (len(LCo) == len(LCov))
@@ -110,19 +97,3 @@ def RingOfCovariants(new_ordering = False, p = 0):
     LW, LCo, LCov, DCov = GetRingGeneratorsCov(new_ordering = new_ordering, p = p)
     return LCo[0].parent()
 
-def LeadingMonomial(cov):
-    assert cov != 0
-    mon = x.monomials()
-    lm = mon[0]
-    ld = lm.degrees()
-    for i in range(1, len(mon)):
-        newd = mon[i].degrees()
-        for j in range(26):
-            if newd[j] > ld[j]:
-                break
-            elif newd[j] < ld[j]: #found bigger monomial
-                lm = mon[i]
-                ld = newd
-                break
-        assert j < 26
-    return lm
