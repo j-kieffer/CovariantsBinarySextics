@@ -69,12 +69,13 @@ class SMF(SageObject):
         return names
 
     def _AddGenerators(covariants, weight): #weight contains character
+        print("Adding {} generators of weight {}".format(len(covariants), weight))
         index = 0
         slope = ZZ(weight[1])/ZZ(weight[0])
         for i in range(len(SMF.gens)):
             w = SMF.weights[i]
             s = ZZ(w[1])/ZZ(w[0])
-            if s > slope or (s == slope and w[0] < weight[0]) or (s == slope and w[0] == weight[0] and w[2] == 0 and character):
+            if s > slope or (s == slope and w[0] < weight[0]) or (s == slope and w[0] == weight[0] and w[2] == 0 and weight[2] == 1):
                 index += 1
             else:
                 break
@@ -85,16 +86,16 @@ class SMF(SageObject):
         newgbasis = []
         for r in SMF.gbasis:
             newr = SMF.ring(0)
-            mons = [m.degrees() for m in r.monomials()]
+            mons = [list(m.degrees()) for m in r.monomials()]
             coeffs = r.coefficients()
             for i in range(len(mons)):
-                newr += c[i] * SMF.ring.monomial(mons[i][0:index] + [0 for j in range(len(covariants))] + mons[i][index:])
-            newgbasis.append(r)
+                newr += coeffs[i] * SMF.ring.monomial(*(mons[i][0:index] + [0 for j in range(len(covariants))] + mons[i][index:]))
+            newgbasis.append(newr)
         SMF.gbasis = newgbasis
         newlt = {}
         for d in SMF.lt.keys():
             newlist = []
-            for t in SMF.lt[j]:
+            for t in SMF.lt[d]:
                 newlist.append((t[0:index] + [0 for j in range(len(covariants))] + t[index:]))
             if d < index:
                 newlt[d] = newlist
@@ -104,8 +105,9 @@ class SMF(SageObject):
         return list(SMF.ring.gens())[index:index + len(covariants)]
 
     def _AddRelation(zerosmf):
+        print("Adding one relation")
         SMF.gbasis.append(zerosmf)
-        d = zerosmf.lm().degrees()
+        d = list(zerosmf.lm().degrees())
         #find out where to put it in the dictionary
         index = 0
         for j in range(len(d)):
@@ -185,6 +187,7 @@ class SMF(SageObject):
                 mat[i,j] = reductions[i].coefficient(V[j])
         #kernel of mat gives relations; pivot rows give linearly independent family
         rels = mat.left_kernel().echelonized_basis()
+        remove = []
         for rel in rels:
             rel = rel * rel.denominator()
             rel = rel.list()
@@ -192,11 +195,10 @@ class SMF(SageObject):
             for i in range(len(rel)):
                 pol += rel[i] * monomials[i]
             SMF._AddRelation(pol)
-            j = monomials.index(pol.lm())
-            monomials.remove(monomials[j])
-            reductions.remove(reductions[j])
-            covs.remove(covs[j])
+            remove.append(monomials.index(pol.lm()))
 
+        monomials = [monomials[j] for j in range(len(monomials)) if not j in remove]
+        reductions = [reductions[j] for j in range(len(monomials)) if not j in remove]
         return monomials, reductions
 
     def _DiagonalExpansion(basis, chi):
@@ -449,8 +451,8 @@ class SMF(SageObject):
         assert SMF.jmax == j - 2
         check = 0
         k = 2
-        while check < 40:
-            print("AllGeneratorsAndRelations: j = {}, k = {}".format(j, k))
+        while check < 10:
+            print("\nAllGeneratorsAndRelations: j = {}, k = {}".format(j, k))
             _, _, n1 = SMF(k, j, character = False)._AddGeneratorsAndRelations()
             _, _, n2 = SMF(k, j, character = True)._AddGeneratorsAndRelations()
             if n1 == 0 and n2 == 0:

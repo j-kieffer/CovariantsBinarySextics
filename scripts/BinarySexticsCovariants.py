@@ -591,7 +591,7 @@ class BinarySexticsCovariants(SageObject):
             else:
                 BinarySexticsCovariants.SyzygousMonomials[index] = [mon]
 
-    #Somehow we can't let Sage know that we already know a Gröbner basis, so we have to reimplement this by hand.
+    #Somehow we can't let Sage know we already have a Gröbner basis, so we have to reimplement this by hand.
     def Reduce(covariant):
         gbasis = BinarySexticsCovariants.gbasis
         cur = covariant
@@ -613,7 +613,6 @@ class BinarySexticsCovariants(SageObject):
                         break
                 if div:
                     index -= 1 #try again at this index
-                    print("Reduce: found divisibility (index = {}, i = {})".format(index, i))
                     d = [d1[i] - d2[i] for i in range(len(d1))]
                     mdiv = BinarySexticsCovariants.ring.monomial(*d)
                     cur = cur - (c / LC[i]) * mdiv * gbasis[i]
