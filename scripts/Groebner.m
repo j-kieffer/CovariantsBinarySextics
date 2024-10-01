@@ -90,3 +90,4 @@ end if;
 
 SetVerbose("Groebner", true);
 newGB, _, denom := GroebnerBasis(GB : ReturnDenominators := true, GlobalModular := false);
+Sort([x/LeadingCoefficient(x): x in GB]) eq Sort([x/LeadingCoefficient(x): x in newGB]);

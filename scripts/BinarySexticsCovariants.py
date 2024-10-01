@@ -118,7 +118,7 @@ def EvaluateMonomials(wts, values_list):
     if nb == 0:
         return []
     R = values_list[0][0].parent()
-    k = len(R.gens())
+    k = len(values_list[0])
     degrees = [0 for i in range(k)]
     for i in range(k):
         #find out the largest degree of R.gens()[i] appearing in wts.
@@ -440,7 +440,7 @@ class BinarySexticsCovariants(SageObject):
         basis, _ = self.GetBasisAndRelations(use_syzygous = True)
         return basis
 
-    def GetBasisWithConditions(self, p = 0):
+    def GetBasisWithConditions(self, p = 0, cusp = False):
         r"""
         Return a set of linearly independent elements in the space of covariants that is
         sufficient to generate the space of holomorphic Siegel modular forms of the
@@ -464,7 +464,8 @@ class BinarySexticsCovariants(SageObject):
         eval_data = []
         dim = len(B)
         n = self.a - (self.b)/2
-        cusp = (n % 2 == 1)
+        #if n is odd, we only have cusp forms anyway.
+        cusp = cusp or (n % 2 == 1)
 
         print("GetBasisWithConditions: starting dimension {}, collecting data...".format(dim))
         for k in range(dim + 4):
@@ -563,6 +564,7 @@ class BinarySexticsCovariants(SageObject):
                         BinarySexticsCovariants.SyzygousMonomials[index] = [mon]
                     nb += 1
             print("total j = {}: {}".format(j, nb))
+        BinarySexticsCovariants.gbasis.sort(reverse = True)
 
     def PrintGroebnerBasis(filename = "Groebner.dat"):
         with open(filename, "w") as f:
@@ -588,6 +590,35 @@ class BinarySexticsCovariants(SageObject):
                 BinarySexticsCovariants.SyzygousMonomials[index].append(mon)
             else:
                 BinarySexticsCovariants.SyzygousMonomials[index] = [mon]
+
+    #Somehow we can't let Sage know that we already know a Gröbner basis, so we have to reimplement this by hand.
+    def Reduce(covariant):
+        gbasis = BinarySexticsCovariants.gbasis
+        cur = covariant
+        LM = [x.lm() for x in gbasis]
+        LC = [x.lc() for x in gbasis]
+        LD = [m.degrees() for m in LM]
+        index = 0
+        while index < len(cur.monomials()): #reduce monomial until not divisible by anything in gbasis
+            m = cur.monomials()[index]
+            c = cur.coefficients()[index]
+            d1 = m.degrees()
+            index += 1
+            for i in range(len(LM)):
+                div = True
+                d2 = LD[i]
+                for j in range(len(d1)):
+                    if d2[j] > d1[j]:
+                        div = False
+                        break
+                if div:
+                    index -= 1 #try again at this index
+                    print("Reduce: found divisibility (index = {}, i = {})".format(index, i))
+                    d = [d1[i] - d2[i] for i in range(len(d1))]
+                    mdiv = BinarySexticsCovariants.ring.monomial(*d)
+                    cur = cur - (c / LC[i]) * mdiv * gbasis[i]
+                    break
+        return cur
 
 try:
     BinarySexticsCovariants.ReadGroebnerBasis()
