@@ -14,14 +14,14 @@ from sage.functions.other import ceil, floor
 #from sage.sets.set import Set
 
 from BinarySexticsCovariants import BinarySexticsCovariants as BSC
-from BinarySexticsCovariants import EvaluateBasicCovariants
+from BinarySexticsCovariants import EvaluateBasicCovariants, ListOfWeights, RingOfCovariants
 from DimFormulaSMFScalarValuedLevel1WithoutCharacter import dim_splitting_SV_All_weight
 from DimFormulaSMFVectorValuedLevel1WithoutCharacter import dim_splitting_VV_All_weight
 from DimFormulaSMFScalarValuedLevel1WithCharacter import dim_splitting_SV_All_weight_charac
 from DimFormulaSMFVectorValuedLevel1WithCharacter import dim_splitting_VV_All_weight_charac
 #from FJexp import VectorFJexp, FJexp
 from ThetaFourier import Chi
-from Generators_Ring_Covariants_Sextic import RingOfCovariants
+#from Generators_Ring_Covariants_Sextic import RingOfCovariants
 import subprocess
 
 #this assumes that mat has full rank
@@ -486,7 +486,7 @@ class SMF(SageObject):
         a = veck + vecj // 2
         vanishing_order = a
         for m in range(nbp):
-            RingCov = RingOfCovariants(new_ordering = True, p = p)
+            RingCov = RingOfCovariants(BSC.LW, p = p)
             if not self.character:
                 basis = BSC(a, vecj).GetBasisWithConditions(p = p)
             else:
@@ -547,7 +547,7 @@ class SMF(SageObject):
                 return []
         print("GetBasis: starting dimension {}, target {}".format(len(covbasis), dim))
 
-        RingCov = RingOfCovariants(new_ordering = True)
+        RingCov = RingOfCovariants(BSC.LW)
         s_prec = vanishing_order - 1
         q_prec = 2
         current_dim = len(covbasis)
