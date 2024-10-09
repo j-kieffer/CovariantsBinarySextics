@@ -483,17 +483,18 @@ class SMF(SageObject):
         vecj = self.j
         p = 101
         nbp = 5
-        a = veck + vecj // 2
-        vanishing_order = a
         for m in range(nbp):
             RingCov = RingOfCovariants(BSC.LW, p = p)
+            a = veck + vecj // 2
+            vanishing_order = a
             if not self.character:
                 basis = BSC(a, vecj).GetBasisWithConditions(p = p)
             else:
-                a -= 5
+                a = 5
                 vanishing_order -= 6
                 basis = BSC(a, vecj).GetBasis()
                 basis = [RingCov(x) for x in basis]
+            print("GetBasis: attempting to prove dimension is zero mod p = {}, starting dimension: {}".format(p, len(basis)))
 
             #proceed as in _GetBasis, but over a finite field
             s_prec = vanishing_order - 1
@@ -540,10 +541,9 @@ class SMF(SageObject):
 
     def _GetBasis(covbasis, vanishing_order, dim, vecj, keq2 = False):
         # When k == 2 we don't know the dimension is 0, and want to verify it.
-        if not keq2:
-            if len(covbasis) == dim:
-                return covbasis
-            if (dim == 0):
+        if len(covbasis) == dim:
+            return covbasis
+        elif not keq2 and (dim == 0):
                 return []
         print("GetBasis: starting dimension {}, target {}".format(len(covbasis), dim))
 
@@ -651,7 +651,7 @@ class SMF(SageObject):
         dim = self.Dimension()
         if k != 2 and dim == 0:
             return
-        elif k == 2:
+        elif k == 2 and dim == 0:
             if self._ConfirmDimZero():
                 return
 
@@ -682,7 +682,7 @@ class SMF(SageObject):
         dim = self.Dimension()
         if (k != 2) and (dim == 0):
             return []
-        elif k == 2:
+        elif k == 2 and dim == 0:
             if self._ConfirmDimZero():
                 return []
             #else, continue with usual algorithm
