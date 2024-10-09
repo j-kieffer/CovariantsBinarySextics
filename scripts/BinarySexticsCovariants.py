@@ -118,7 +118,7 @@ def EvaluateMonomials(wts, values_list):
     if nb == 0:
         return []
     R = values_list[0][0].parent()
-    k = len(R.gens())
+    k = len(values_list[0])
     degrees = [0 for i in range(k)]
     for i in range(k):
         #find out the largest degree of R.gens()[i] appearing in wts.
