@@ -105,9 +105,9 @@ class SMF(SageObject):
         return list(SMF.ring.gens())[index:index + len(covariants)]
 
     def _AddRelation(zerosmf):
-        print("Adding one relation")
         SMF.gbasis.append(zerosmf)
         d = list(zerosmf.lm().degrees())
+        print("Adding one relation with leading monomial {}".format(SMF.ring.monomial(*d)))
         #find out where to put it in the dictionary
         index = 0
         for j in range(len(d)):
@@ -447,11 +447,11 @@ class SMF(SageObject):
         new_smfs = SMF._AddGenerators(new_gens, wt)
         return knownsmfs + new_smfs, knowncovs + new_gens, len(new_gens)
 
-    def _AllGeneratorsAndRelations(j):
+    def _AllGeneratorsAndRelations(j, bound = 20):
         assert SMF.jmax == j - 2
         check = 0
         k = 2
-        while check < 10:
+        while check < bound:
             print("\nAllGeneratorsAndRelations: j = {}, k = {}".format(j, k))
             _, _, n1 = SMF(k, j, character = False)._AddGeneratorsAndRelations()
             _, _, n2 = SMF(k, j, character = True)._AddGeneratorsAndRelations()
