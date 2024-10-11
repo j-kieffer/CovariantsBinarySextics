@@ -19,6 +19,7 @@ from sage.sets.set import Set
 from BinarySexticsCovariants import BinarySexticsCovariants as BSC
 from BinarySexticsCovariants import EvaluateBasicCovariants, RingOfCovariants, EvaluateMonomial
 from ThetaFourier import Chi
+from ModuleGenerators import BoundOnModuleGenerators
 from DimFormulaSMFScalarValuedLevel1WithoutCharacter import dim_splitting_SV_All_weight
 from DimFormulaSMFVectorValuedLevel1WithoutCharacter import dim_splitting_VV_All_weight
 from DimFormulaSMFScalarValuedLevel1WithCharacter import dim_splitting_SV_All_weight_charac
@@ -136,10 +137,15 @@ class SMF(SageObject):
 
         return all_ws
 
-    def _GetGenerators(wt):
+    def _GetGenerators(wt, target_dim, new_generators = True):
+        print("GetGenerators: enumerating monomials...");
         all_ws = SMF._GetGeneratorsRec(SMF.weights, 0, wt, SMF.lt)
         monomials = [SMF.ring.monomial(*w) for w in all_ws]
         monomials.sort(reverse = True) #leading monomials first
+
+        if new_generators and len(monomials) == target_dim:
+            return monomials, [], 0
+
         covs = []
         for m in monomials:
             d = m.degrees()
@@ -151,32 +157,57 @@ class SMF(SageObject):
             cov = EvaluateMonomial(d, SMF.gens)
             cov *= SMF.chi10cov ** (n // 2)
             covs.append(cov)
-        reductions = [BSC.Reduce(c) for c in covs]
 
-        #linear algebra to make sure we output a linearly independent family (add relations)
-        V = Set()
-        for r in reductions:
-            V = V.union(Set(r.monomials()))
-        V = V.list()
-        mat = Matrix(QQ, len(monomials), len(V))
-        for i in range(len(monomials)):
-            for j in range(len(V)):
-                mat[i,j] = reductions[i].coefficient(V[j])
-        #kernel of mat gives relations; pivot rows give linearly independent family
-        rels = mat.left_kernel().echelonized_basis()
-        nb_rel = len(rels)
-        remove = []
-        for rel in rels:
-            rel = rel * rel.denominator()
-            rel = rel.list()
-            pol = SMF.ring(0)
-            for i in range(len(rel)):
-                pol += rel[i] * monomials[i]
-            SMF._AddRelation(pol)
-            remove.append(monomials.index(pol.lm()))
+        if new_generators:
+            assert len(monomials) > target_dim
+            #use evaluations to find linear dependencies.
+            rank = 0
+            eval_data = []
+            while rank < target_dim:
+                for i in range(target_dim - rank + 10):
+                    f = RandomSextic(QQ, 10)
+                    basic = EvaluateBasicCovariants(f)
+                    subs_dict = {}
+                    for i in range(26):
+                        subs_dict[BSC.ring.gen[i]] = basic[i]
+                    smf_values = [pol.subs(subs_dict).coefficients[][0] for pol in SMF.gens]
+                    eval_data.append(EvaluateMonomial(mon, smf_values) for mon in monomials)
+                mat = Matrix(QQ, eval_data).transpose() #lines are monomials
+                rels = mat.left_kernel().echelonized_basis()
+                rank = len(monomials) - len(rels)
+            #we're done.
+            nb_rel = len(rels)
+            reductions = []
 
-        monomials = [monomials[j] for j in range(len(monomials)) if not j in remove]
-        reductions = [reductions[j] for j in range(len(monomials)) if not j in remove]
+        else:
+            print("GetGenerators: reduction...");
+            reductions = [BSC.Reduce(c) for c in covs]
+
+            #linear algebra to make sure we output a linearly independent family (add relations)
+            V = Set()
+            for r in reductions:
+                V = V.union(Set(r.monomials()))
+            V = V.list()
+            mat = Matrix(QQ, len(monomials), len(V))
+            for i in range(len(monomials)):
+                for j in range(len(V)):
+                    mat[i,j] = reductions[i].coefficient(V[j])
+            #kernel of mat gives relations; pivot rows give linearly independent family
+            print("GetGenerators: linear algebra...");
+            rels = mat.left_kernel().echelonized_basis()
+            nb_rel = len(rels)
+            remove = []
+            for rel in rels:
+                rel = rel * rel.denominator()
+                rel = rel.list()
+                pol = SMF.ring(0)
+                for i in range(len(rel)):
+                    pol += rel[i] * monomials[i]
+                SMF._AddRelation(pol)
+                remove.append(monomials.index(pol.lm()))
+            monomials = [monomials[j] for j in range(len(monomials)) if not j in remove]
+            reductions = [reductions[j] for j in range(len(monomials)) if not j in remove]
+
         return monomials, reductions, nb_rel
 
     def _DiagonalExpansion(basis, chi):
@@ -330,7 +361,7 @@ class SMF(SageObject):
         return (current_dim == 0)
 
     #return list of SMFs, list of covariants, nb of new generators, nb of new relations
-    def _AddGeneratorsAndRelations(self):
+    def _AddGeneratorsAndRelations(self, new_generators = True):
         dim = self.Dimension()
         if self.k != 2 and dim == 0:
             return [], [], 0, 0
@@ -342,9 +373,10 @@ class SMF(SageObject):
         wt = (self.k, self.j, GF(2)(0))
         if self.character:
             wt = (self.k, self.j, GF(2)(1))
-        knownsmfs, knowncovs, nb_rel = SMF._GetGenerators(wt)
+        knownsmfs, knowncovs, nb_rel = SMF._GetGenerators(wt, dim, new_generators = new_generators)
         if len(knownsmfs) == dim:
             return knownsmfs, knowncovs, 0, nb_rel
+        assert not new_generators
 
         #otherwise, construct new generators from covariants
         a = self.k + self.j // 2
@@ -427,16 +459,17 @@ class SMF(SageObject):
         new_smfs = SMF._AddGenerators(new_gens, wt)
         return knownsmfs + new_smfs, knowncovs + new_gens, len(new_gens), nb_rel
 
-    def _AllGeneratorsAndRelations(j, bound = 30):
+    def _AllGeneratorsAndRelations(j, bound = 20):
         assert SMF.jmax == j - 2
         check = 0
         k = 2
+        kmax = BoundOnModuleGenerators(j)
         while check < bound:
             print("\nAllGeneratorsAndRelations: j = {}, k = {}, no character".format(j, k))
-            _, _, n1, m1 = SMF(k, j, character = False)._AddGeneratorsAndRelations()
+            _, _, n1, m1 = SMF(k, j, character = False)._AddGeneratorsAndRelations(new_generators = (k <= kmax))
             print("\nAllGeneratorsAndRelations: j = {}, k = {}, with character".format(j, k))
-            _, _, n2, m2 = SMF(k, j, character = True)._AddGeneratorsAndRelations()
-            if n1 == 0 and n2 == 0:
+            _, _, n2, m2 = SMF(k, j, character = True)._AddGeneratorsAndRelations(new_generators = (k <= kmax))
+            if n1 == 0 and n2 == 0 and m1 == 0 and m2 == 0:
                 check += 1
             else:
                 check = 0
@@ -448,6 +481,58 @@ class SMF(SageObject):
             for j in range(SMF.jmax + 2, self.j + 2, 2):
                 SMF._AllGeneratorsAndRelations(j)
         return self._AddGeneratorsAndRelations()
+
+    def ReadGenerators(prefix = "SMF_"):
+        names = []
+        with open(prefix + "names.dat") as f:
+            for line in f:
+                names.append(line.strip("\n"))
+        SMF.names = names
+        SMF.ring = PolynomialRing(QQ, len(SMF.names), SMF.names, order = "neglex")
+        weights = []
+        SMF.jmax = 0
+        for n in names:
+            _, k, j, eps = n.split("_")
+            weights.append((ZZ(k), ZZ(j), GF(2)(eps[0])))
+            SMF.jmax = max(SMF.jmax, ZZ(j))
+        SMF.weights = weights
+
+        gens = []
+        with open(prefix + "gens.dat") as f:
+            for line in f:
+                gens.append(BSC.ring(line))
+        SMF.gens = gens
+
+        gbasis = []
+        with open(prefix + "rels.dat") as f:
+            for line in f:
+                gbasis.append(SMF.ring(line))
+        SMF.gbasis = gbasis
+        SMF.lt = {}
+        for x in gbasis:
+            d = list(x.lm().degrees())
+            index = 0
+            for i in range(len(d)):
+                if d[i] > 0:
+                    index = i
+            if index in SMF.lt.keys():
+                SMF.lt[index].append(d)
+            else:
+                SMF.lt[index] = [d]
+
+    def PrintGenerators(prefix = "SMF_"):
+        with open(prefix + "gens.dat", "w") as f:
+            for x in SMF.gens:
+                f.write(str(x))
+                f.write("\n")
+        with open(prefix + "rels.dat", "w") as f:
+            for x in SMF.gbasis:
+                f.write(str(x))
+                f.write("\n")
+        with open(prefix + "names.dat", "w") as f:
+            for x in SMF.names:
+                f.write(x)
+                f.write("\n")
 
     def WriteBasisToFile(self, filename, mode):
         d = self.Dimension()

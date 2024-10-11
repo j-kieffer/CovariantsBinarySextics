@@ -13,10 +13,14 @@ from sage.rings.finite_rings.finite_field_constructor import GF
 
 def ListOfWeights(new_ordering = False):
     if new_ordering:
-        return [(1, 6), (2, 8), (3, 12), (3, 8), (4, 10), (2, 4), (3, 6), (5, 8),
-                (4, 6), (4, 4), (6, 6), (6, 6), (5, 4), (3, 2), (7, 4), (9, 4),
-                (5, 2), (7, 2), (8, 2), (10, 2), (12, 2), (2, 0), (4, 0),
-                (6, 0), (10, 0), (15, 0)]
+        return [(2, 0), (4, 0), (6, 0), (10, 0), (15, 0), (3, 2), (5, 2), (7, 2),
+                (8, 2), (10, 2), (12, 2), (2, 4), (4, 4), (5, 4), (7, 4), (9, 4),
+                (1, 6), (3, 6), (4, 6), (6, 6), (6, 6), (2, 8), (3, 8), (5, 8),
+                (4, 10), (3, 12)]
+       # return [(1, 6), (2, 8), (3, 12), (3, 8), (4, 10), (2, 4), (3, 6), (5, 8),
+       #         (4, 6), (4, 4), (6, 6), (6, 6), (5, 4), (3, 2), (7, 4), (9, 4),
+       #         (5, 2), (7, 2), (8, 2), (10, 2), (12, 2), (2, 0), (4, 0),
+       #         (6, 0), (10, 0), (15, 0)]
     else:
         return [(1, 6), (2, 0), (2, 4), (2, 8), (3, 2), (3, 6), (3, 8), (3, 12),
                 (4, 0), (4, 4), (4, 6), (4, 10), (5, 2), (5, 4), (5, 8), (6, 0),
@@ -299,23 +303,23 @@ class BinarySexticsCovariants(SageObject):
             return []
         elif len(weight_list) == 0:
             return []
-        elif len(weight_list) <= 5 and wt[1] > 0: #no vector-valued covariants left
-            return []
-        elif len(weight_list) <= 8 and wt[0] % 2 == 1 and wt[0] < 15: #only R has an odd a
-            return []
+        #elif len(weight_list) <= 5 and wt[1] > 0: #no vector-valued covariants left
+        #    return []
+        #elif len(weight_list) <= 8 and wt[0] % 2 == 1 and wt[0] < 15: #only R has an odd a
+        #    return []
 
         #Compute min_w0, max_w0
         wt0 = weight_list[0]
         max_w0 = min([wt[i] // wt0[i] for i in range(2) if wt0[i] != 0])
         min_w0 = 0
-        if wt0[1] > 0:
-            slope = ZZ(weight_list[1][1]) / ZZ(weight_list[1][0])
-            assert wt0[1] - slope * wt0[0] >= 0
-            if wt[1] - slope * wt[0] > 0:
-                if wt0[1] - slope * wt0[0] == 0:
-                    return []
-                else:
-                    min_w0 = ceil((wt[1] - slope * wt[0])/(wt0[1] - slope * wt0[0]))
+        #if wt0[1] > 0:
+        #    slope = ZZ(weight_list[1][1]) / ZZ(weight_list[1][0])
+        #    assert wt0[1] - slope * wt0[0] >= 0
+        #    if wt[1] - slope * wt[0] > 0:
+        #        if wt0[1] - slope * wt0[0] == 0:
+        #            return []
+        #        else:
+        #            min_w0 = ceil((wt[1] - slope * wt[0])/(wt0[1] - slope * wt0[0]))
 
         #adjust max_w0 given the list of syzygous monomials.
         degrees = syzygous.get(index)

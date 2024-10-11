@@ -1,7 +1,12 @@
 
 //Computing a Groebner basis from Stroh's syzygies
-weights := [15,10,6,4,2,12,10,8,7,5,9,7,3,5,6,6,4,4,5,3,2,4,3,3,2,1];
-RingCov<R,D,C,B,A,lambda,mu,nu,n,m,rho,pi,l,u,w,v,Delta,s,t,p,i,r,q,T,H,f>
+//weights := [15,10,6,4,2,12,10,8,7,5,9,7,3,5,6,6,4,4,5,3,2,4,3,3,2,1];
+//RingCov<R,D,C,B,A,lambda,mu,nu,n,m,rho,pi,l,u,w,v,Delta,s,t,p,i,r,q,T,H,f>
+//:= PolynomialRing(Rationals(), weights);
+
+//Do not use the slope ordering anymore
+weights := Reverse([2,4,6,10,15,3,5,7,8,10,12,2,4,5,7,9,1,3,4,6,6,2,3,5,4,3]);
+RingCov<T,r,t,q,H,w,v,s,p,f,rho,pi,u,Delta,i,lambda,mu,nu,n,m,l,R,D,C,B,A>
 := PolynomialRing(Rationals(), weights);
 
 S := [RingCov ! 0: i in [1..20]];
