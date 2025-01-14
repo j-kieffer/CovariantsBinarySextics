@@ -1,0 +1,19 @@
+# To remove the docker build messages and disable auto-updates
+# of the container:
+# export DOCKER_SAGEMATH_NO_PULL=1
+GetBasisWithConditions: starting dimension 6, collecting data...
+GetBasisWithConditions: linear algebra over Fp...
+GetBasisWithConditions: found dimension 1
+GetBasisWithConditions: linear algebra over QQ (size 5 x 6, height 56.4597986348651)...
+GetBasisWithConditions: saturation...
+
+k = 10
+
+GetBasisWithConditions: starting dimension 8, collecting data...
+GetBasisWithConditions: linear algebra over Fp...
+GetBasisWithConditions: found dimension 0
+GetBasis: attempting to prove dimension is zero mod p = 101, starting dimension: 0
+
+
+0.35440945625305176
+True

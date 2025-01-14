@@ -1,0 +1,3 @@
+# To remove the docker build messages and disable auto-updates
+# of the container:
+# export DOCKER_SAGEMATH_NO_PULL=1

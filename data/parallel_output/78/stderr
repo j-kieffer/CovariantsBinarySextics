@@ -1,0 +1,70 @@
+DEPRECATED: The legacy builder is deprecated and will be removed in a future release.
+            Install the buildx component to build images with BuildKit:
+            https://docs.docker.com/go/buildx/
+
+Sending build context to Docker daemon  3.072kB
+Step 1/3 : FROM sagemath/sagemath:latest
+latest: Pulling from sagemath/sagemath
+Digest: sha256:490693d2b619b032576c8c3a9e91795cba3f2a5433a6bbb8577ef126b29e0774
+Status: Image is up to date for sagemath/sagemath:latest
+ ---> 8436018569d7
+Step 2/3 : RUN DEBIAN_FRONTEND=noninteractive sudo apt-get -y update && sudo apt-get -y install --no-install-recommends eog xdg-utils less xauth libfile-mimeinfo-perl
+ ---> Using cache
+ ---> 8cb4e205c78d
+Step 3/3 : COPY sage-wrapper /usr/bin/sage-wrapper
+ ---> Using cache
+ ---> d01048d55f11
+Successfully built d01048d55f11
+Successfully tagged caramba/pre-sagemath:latest
+DEPRECATED: The legacy builder is deprecated and will be removed in a future release.
+            Install the buildx component to build images with BuildKit:
+            https://docs.docker.com/go/buildx/
+
+Sending build context to Docker daemon  2.048kB
+Step 1/5 : FROM caramba/pre-sagemath:latest
+ ---> d01048d55f11
+Step 2/5 : USER root:root
+ ---> Using cache
+ ---> f4c8c3ef5eb1
+Step 3/5 : RUN userdel sage && rm -f /etc/sudoers.d/01-sage && groupadd caramba -g 200357 && useradd -m jkieffer -u 660746 -g caramba && chown jkieffer:caramba $HOME && echo 'jkieffer ALL=(ALL) NOPASSWD:ALL' | tee /etc/sudoers.d/02-jkieffer
+ ---> Using cache
+ ---> ebcd40e1cc86
+Step 4/5 : USER jkieffer:caramba
+ ---> Using cache
+ ---> 59cf3358f9a7
+Step 5/5 : ENTRYPOINT [ "/usr/local/bin/sage-entrypoint" ]
+ ---> Using cache
+ ---> 477a00300052
+Successfully built 477a00300052
+Successfully tagged caramba/sagemath-jkieffer-caramba:latest
+Traceback (most recent call last):
+  File "sage/rings/polynomial/multi_polynomial_libsingular.pyx", line 986, in sage.rings.polynomial.multi_polynomial_libsingular.MPolynomialRing_libsingular._element_constructor_ (build/cythonized/sage/rings/polynomial/multi_polynomial_libsingular.cpp:19500)
+  File "<string>", line 1, in <module>
+NameError: name 'h' is not defined
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/users/jkieffer/CovariantsBinarySextics/scripts/Check_Dim_Zero.sage.py", line 13, in <module>
+    test = SMF(_sage_const_2 ,k,False)._ConfirmDimZero()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/users/jkieffer/CovariantsBinarySextics/scripts/SiegelModularForms.py", line 357, in _ConfirmDimZero
+    basis = BSC(a, vecj).GetBasisWithConditions(p = p)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/users/jkieffer/CovariantsBinarySextics/scripts/BinarySexticsCovariants.py", line 479, in GetBasisWithConditions
+    basic = EvaluateBasicCovariants(f, leading_coefficient = False)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/users/jkieffer/CovariantsBinarySextics/scripts/BinarySexticsCovariants.py", line 69, in EvaluateBasicCovariants
+    C[(2,0)] = transvectant(f, f, 6)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sage/sage/local/var/lib/sage/venv-python3.12.5/lib/python3.12/site-packages/sage/rings/invariants/invariant_theory.py", line 264, in transvectant
+    f = f.homogenized()
+        ^^^^^^^^^^^^^^^
+  File "/home/sage/sage/local/var/lib/sage/venv-python3.12.5/lib/python3.12/site-packages/sage/rings/invariants/invariant_theory.py", line 744, in homogenized
+    variables = [R(_) for _ in self._variables[0:-1]] + [R(var)]
+                                                         ^^^^^^
+  File "sage/structure/parent.pyx", line 901, in sage.structure.parent.Parent.__call__ (build/cythonized/sage/structure/parent.c:12762)
+  File "sage/structure/coerce_maps.pyx", line 164, in sage.structure.coerce_maps.DefaultConvertMap_unique._call_ (build/cythonized/sage/structure/coerce_maps.c:6979)
+  File "sage/structure/coerce_maps.pyx", line 159, in sage.structure.coerce_maps.DefaultConvertMap_unique._call_ (build/cythonized/sage/structure/coerce_maps.c:6871)
+  File "sage/rings/polynomial/multi_polynomial_libsingular.pyx", line 988, in sage.rings.polynomial.multi_polynomial_libsingular.MPolynomialRing_libsingular._element_constructor_ (build/cythonized/sage/rings/polynomial/multi_polynomial_libsingular.cpp:19555)
+TypeError: Could not find a mapping of the passed element to this ring.
